@@ -7,9 +7,9 @@ description: >-
 
 # MyBatis-Flex 开发技能
 
-优先使用链式操作（QueryChain、UpdateChain、DbChain）。
+优先使用链式操作（Chain Operations）：QueryChain、UpdateChain、DbChain。
 
-## 实体类定义
+## Entity 实体类定义
 
 ```java
 @Table("tb_account")
@@ -23,7 +23,7 @@ public class Account extends BaseEntity {
 
 APT 自动生成 TableDef 类（如 `ACCOUNT`），用于类型安全查询。
 
-## 链式操作（优先使用）
+## 链式操作（Chain Operations）- 优先使用
 
 ### QueryChain 查询
 
@@ -39,7 +39,7 @@ Account account = accountMapper.queryChain()
     .where(ACCOUNT.ID.eq("xxx"))
     .one();
 
-// 分页查询
+// 分页查询（Pagination）
 Page<Account> page = accountMapper.queryChain()
     .where(ACCOUNT.AGE.ge(18))
     .page(1, 10);
@@ -51,7 +51,7 @@ List<Account> list = accountMapper.queryChain()
     .list();
 ```
 
-**常用方法：** `one()` / `list()` / `page()` / `count()` / `exists()` / `oneAs()` / `listAs()` / `oneWithRelations()` / `listWithRelations()`
+**常用方法（Common Methods）：** `one()` / `list()` / `page()` / `count()` / `exists()` / `oneAs()` / `listAs()` / `oneWithRelations()` / `listWithRelations()`
 
 ### UpdateChain 更新
 
@@ -63,7 +63,7 @@ UpdateChain.of(Account.class)
     .where(Account::getId).eq("xxx")
     .update();
 
-// 原子更新
+// 原子更新（Atomic Update）
 UpdateChain.of(Account.class)
     .set(Account::getAge, ACCOUNT.AGE.add(1))
     .where(Account::getId).ge("xxx")
@@ -73,13 +73,13 @@ UpdateChain.of(Account.class)
 ### DbChain 操作
 
 ```java
-// 新增
+// 新增（Insert）
 DbChain.table("tb_account")
     .set("user_name", "zhang san")
     .set("age", 18)
     .save();
 
-// 查询
+// 查询（Select）
 DbChain.table("tb_account")
     .select("id", "user_name")
     .where("age > ?", 18)
@@ -89,21 +89,21 @@ DbChain.table("tb_account")
 ## BaseMapper 操作
 
 ```java
-// 新增
+// 新增（Insert）
 accountMapper.insert(entity);
 accountMapper.insertSelective(entity);  // 忽略 null
 
-// 查询
+// 查询（Select）
 accountMapper.selectOneById("xxx");
 accountMapper.selectAll();
 accountMapper.selectListByQuery(query);
 accountMapper.paginate(1, 10, query);
 
-// 更新
-accountMapper.update(entity);  // ID 更新，忽略 null
+// 更新（Update）
+accountMapper.update(entity);  // 通过 ID 更新，忽略 null
 accountMapper.updateByQuery(entity, query);
 
-// 删除
+// 删除（Delete）
 accountMapper.deleteById("xxx");
 accountMapper.deleteByQuery(query);
 ```
@@ -128,7 +128,7 @@ public class AccountService {
 }
 ```
 
-## 事务管理
+## 事务管理（Transaction Management）
 
 ```java
 // 使用 TransactionUtil
@@ -138,7 +138,7 @@ TransactionUtil.execute(transactionManager, status -> {
 });
 ```
 
-## 参考文档
+## 参考文档（Reference）
 
 详细信息请查阅 `references/` 目录：
 
@@ -148,7 +148,7 @@ TransactionUtil.execute(transactionManager, status -> {
 - **04-service-mapper.md** - Service 与 Mapper 操作参考
 - **05-type-handling.md** - 数据类型处理（枚举、JSON、日期等）
 
-## 常用导入
+## 常用导入（Common Imports）
 
 ```java
 import com.mybatisflex.core.query.QueryWrapper;
@@ -164,6 +164,6 @@ import com.mybatisflex.annotation.KeyType;
 // APT 生成的 TableDef
 import static com.your.package.entity.table.AccountTableDef.ACCOUNT;
 
-// SQL 函数
+// SQL 函数（SQL Functions）
 import com.mybatisflex.core.query.QueryMethods;
 ```
