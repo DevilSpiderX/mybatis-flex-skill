@@ -1,0 +1,49 @@
+HELP.md
+**/target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
+
+### STS ###
+.apt_generated
+.classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
+
+### IntelliJ IDEA ###
+**/.idea/
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+**/.vscode/
+
+### 全文搜索服务默认索引保存路径 ###
+textSearch/
+
+### 上传文件默认保存路径 ###
+uploads/
+
+### 根目录下的不上传git ###
+/application.yml
+*/application.yml
+*/application-local.yml
+/.claude/
+/.codex/
+/.run/
+
+.proxyai

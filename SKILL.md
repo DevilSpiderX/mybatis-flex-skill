@@ -1,0 +1,169 @@
+---
+name: mybatis-flex-skill
+description: >-
+  MyBatis-Flex 开发技能。当用户需要使用 MyBatis-Flex 框架编写 Java 持久层代码时激活，
+  包括实体类定义、CRUD 操作、链式查询、关联查询、批量操作等场景。
+---
+
+# MyBatis-Flex 开发技能
+
+优先使用链式操作（QueryChain、UpdateChain、DbChain）。
+
+## 实体类定义
+
+```java
+@Table("tb_account")
+public class Account extends BaseEntity {
+    @Id(keyType = KeyType.Generator, value = UUIDv7KeyGenerator.NAME)
+    private String id;
+    private String userName;
+    private Integer age;
+}
+```
+
+APT 自动生成 TableDef 类（如 `ACCOUNT`），用于类型安全查询。
+
+## 链式操作（优先使用）
+
+### QueryChain 查询
+
+```java
+// 基本查询
+List<Account> accounts = accountMapper.queryChain()
+    .where(ACCOUNT.AGE.ge(18))
+    .and(ACCOUNT.USER_NAME.like("michael"))
+    .list();
+
+// 查询单条
+Account account = accountMapper.queryChain()
+    .where(ACCOUNT.ID.eq("xxx"))
+    .one();
+
+// 分页查询
+Page<Account> page = accountMapper.queryChain()
+    .where(ACCOUNT.AGE.ge(18))
+    .page(1, 10);
+
+// Lambda 条件
+List<Account> list = accountMapper.queryChain()
+    .where(Account::getId).ge("xxx")
+    .and(Account::getUserName).like("michael")
+    .list();
+```
+
+**常用方法：** `one()` / `list()` / `page()` / `count()` / `exists()` / `oneAs()` / `listAs()` / `oneWithRelations()` / `listWithRelations()`
+
+### UpdateChain 更新
+
+```java
+// 更新字段
+UpdateChain.of(Account.class)
+    .set(Account::getUserName, "张三")
+    .set(Account::getAge, 25)
+    .where(Account::getId).eq("xxx")
+    .update();
+
+// 原子更新
+UpdateChain.of(Account.class)
+    .set(Account::getAge, ACCOUNT.AGE.add(1))
+    .where(Account::getId).ge("xxx")
+    .update();
+```
+
+### DbChain 操作
+
+```java
+// 新增
+DbChain.table("tb_account")
+    .set("user_name", "zhang san")
+    .set("age", 18)
+    .save();
+
+// 查询
+DbChain.table("tb_account")
+    .select("id", "user_name")
+    .where("age > ?", 18)
+    .list();
+```
+
+## BaseMapper 操作
+
+```java
+// 新增
+accountMapper.insert(entity);
+accountMapper.insertSelective(entity);  // 忽略 null
+
+// 查询
+accountMapper.selectOneById("xxx");
+accountMapper.selectAll();
+accountMapper.selectListByQuery(query);
+accountMapper.paginate(1, 10, query);
+
+// 更新
+accountMapper.update(entity);  // ID 更新，忽略 null
+accountMapper.updateByQuery(entity, query);
+
+// 删除
+accountMapper.deleteById("xxx");
+accountMapper.deleteByQuery(query);
+```
+
+## Service 层
+
+直接注入 Mapper 使用，不继承 IService：
+
+```java
+@Service
+@RequiredArgsConstructor
+public class AccountService {
+    private final AccountMapper accountMapper;
+    
+    public List<Account> list() {
+        return accountMapper.selectAll();
+    }
+    
+    public Account getById(String id) {
+        return accountMapper.selectOneById(id);
+    }
+}
+```
+
+## 事务管理
+
+```java
+// 使用 TransactionUtil
+TransactionUtil.execute(transactionManager, status -> {
+    orderMapper.insert(order);
+    return null;
+});
+```
+
+## 参考文档
+
+详细信息请查阅 `references/` 目录：
+
+- **01-annotations.md** - 实体注解详解（@Table、@Id、@Column、@Relation 等）
+- **02-querywrapper-advanced.md** - QueryWrapper 高级用法（多表关联、子查询、SQL 函数等）
+- **03-base-entities.md** - 基础实体类与配置（BaseEntity、UUIDv7、自动填充、TransactionUtil）
+- **04-service-mapper.md** - Service 与 Mapper 操作参考
+- **05-type-handling.md** - 数据类型处理（枚举、JSON、日期等）
+
+## 常用导入
+
+```java
+import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.query.QueryChain;
+import com.mybatisflex.core.update.UpdateChain;
+import com.mybatisflex.core.update.UpdateEntity;
+import com.mybatisflex.core.row.Db;
+import com.mybatisflex.core.row.DbChain;
+import com.mybatisflex.core.keygen.KeyGeneratorFactory;
+import com.mybatisflex.annotation.Id;
+import com.mybatisflex.annotation.KeyType;
+
+// APT 生成的 TableDef
+import static com.your.package.entity.table.AccountTableDef.ACCOUNT;
+
+// SQL 函数
+import com.mybatisflex.core.query.QueryMethods;
+```
