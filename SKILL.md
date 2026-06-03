@@ -112,6 +112,8 @@ accountMapper.deleteByQuery(query);
 
 ## Service 层
 
+> ⚠️ **重要限制**：ServiceImpl **不能**继承 IService，直接注入 Mapper 使用。
+
 直接注入 Mapper 使用，不继承 IService：
 
 ```java
@@ -149,6 +151,7 @@ TransactionUtil.execute(transactionManager, status -> {
 - **03-base-entities.md** - 基础实体类与配置（BaseEntity、UUIDv7、自动填充、TransactionUtil）
 - **04-service-mapper.md** - Service 与 Mapper 操作参考
 - **05-type-handling.md** - 数据类型处理（枚举、JSON、日期等）
+- **06-source-api.md** - 源码级 API 参考（QueryMethods、QueryWrapper、ChainQuery 完整方法列表）
 
 ## 常用导入（Common Imports）
 

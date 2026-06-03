@@ -1,5 +1,7 @@
 # Service 与 Mapper 操作参考
 
+> ⚠️ **重要限制**：ServiceImpl **不能**继承 IService，直接注入 Mapper 使用。
+
 ## Service 实现（不继承 IService）
 
 直接在 ServiceImpl 中注入 Mapper 使用：

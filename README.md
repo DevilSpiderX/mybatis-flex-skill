@@ -49,6 +49,8 @@ APT 自动生成 TableDef 类，用于类型安全查询。
 
 ### Service 层最佳实践
 
+> ⚠️ **重要限制**：ServiceImpl **不能**继承 IService，直接注入 Mapper 使用。
+
 直接注入 Mapper 使用，不继承 IService：
 
 ```java
