@@ -148,6 +148,7 @@ TransactionUtil.execute(transactionManager, status -> {
 
 - **01-annotations.md** - 实体注解详解（@Table、@Id、@Column、@Relation 等）
 - **02-querywrapper-advanced.md** - QueryWrapper 高级用法（多表关联、子查询、SQL 函数等）
+- **02a-querychain.md** - QueryChain 链式查询详解（基于 QueryWrapper，提供 one/list/page/obj 等便捷方法）
 - **03-base-entities.md** - 基础实体类与配置（BaseEntity、UUIDv7、自动填充、TransactionUtil）
 - **04-service-mapper.md** - Service 与 Mapper 操作参考
 - **05-type-handling.md** - 数据类型处理（枚举、JSON、日期等）
