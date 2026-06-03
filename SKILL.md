@@ -1,8 +1,10 @@
 ---
 name: mybatis-flex-skill
 description: >-
-  MyBatis-Flex 开发技能。当用户需要使用 MyBatis-Flex 框架编写 Java 持久层代码时激活，
-  包括实体类定义、CRUD 操作、链式查询、关联查询、批量操作等场景。
+  MyBatis-Flex 开发技能。当用户请求涉及 MyBatis-Flex 框架时激活，
+  包括编写代码、检查代码、优化代码、代码重构、问题排查、代码解释、
+  最佳实践咨询、版本迁移等场景，涵盖实体类定义、CRUD 操作、
+  链式查询、关联查询、批量操作等。
 ---
 
 # MyBatis-Flex 开发技能
