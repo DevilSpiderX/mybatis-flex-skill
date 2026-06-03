@@ -65,6 +65,34 @@ public class AccountService {
 }
 ```
 
+### OptionalField 三态值类型（可选功能）
+
+> OptionalField 是自定义的三态值类型，用于处理部分更新场景（如 PATCH 请求）。
+
+| 状态 | 含义 | UpdateEntity 行为 |
+|------|------|-------------------|
+| `VALUE` | 有值 | `set(field, value)` |
+| `NULL` | 字段存在但为 null | `set(field, null)` |
+| `MISSING` | 字段不存在 | 忽略，不调用 set |
+
+```java
+// DTO 定义
+@Data
+public class UserUpdateDTO {
+    private OptionalField<String> name = OptionalField.missing();  // 不修改
+    private OptionalField<Integer> age = OptionalField.of(25);     // 设置为 25
+    private OptionalField<String> email = OptionalField._null();   // 设置为 null
+}
+
+// Service 使用
+public void updateUser(String userId, UserUpdateDTO dto) {
+    User updateEntity = OptionalDtoUtil.toUpdateEntity(dto, User.class, userId);
+    userMapper.update(updateEntity);
+}
+```
+
+> 详细信息请查阅 `references/07-optional-field.md`
+
 ## 📚 参考文档
 
 详细信息请查阅 `references/` 目录：

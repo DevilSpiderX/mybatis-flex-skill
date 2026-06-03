@@ -52,7 +52,7 @@ QueryWrapper query = QueryWrapper.create()
 
 ## 动态条件
 
-在 `where`、`and`、`or` 等方法中，**推荐使用 APT 生成的 `QueryColumn`（如 `ACCOUNT.AGE`、`ACCOUNT.USER_NAME`）**，而不是 Lambda（如 `Account::getAge`）。`when`、`If::hasText` 等条件判断保持 Lambda 写法即可。
+在 `where`、`and`、`or` 等方法中，**推荐使用 APT 生成的 `QueryColumn`（如 `ACCOUNT.AGE`、`ACCOUNT.USER_NAME`）**，而不是 `Lambda`（如 `Account::getAge`）。`when`、`If::hasText` 等条件判断保持 `Lambda` 写法即可。
 
 ### 基础动态
 
