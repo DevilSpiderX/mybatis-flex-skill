@@ -134,13 +134,36 @@ public class AccountService {
 
 ## 事务管理（Transaction Management）
 
+### 方式一：使用 `@Transactional` 注解
+
+推荐在 Service 方法上使用 Spring 的 `@Transactional` 注解：
+
 ```java
-// 使用 TransactionUtil
-TransactionUtil.execute(transactionManager, status -> {
-    orderMapper.insert(order);
-    return null;
-});
+@Service
+@RequiredArgsConstructor
+public class OrderService {
+    private final OrderMapper orderMapper;
+    
+    @Transactional
+    public void createOrder(Order order) {
+        orderMapper.insert(order);
+        // 其他数据库操作...
+    }
+    
+    @Transactional(readOnly = true)
+    public Order getOrder(String id) {
+        return orderMapper.selectOneById(id);
+    }
+}
 ```
+
+### 方式二：使用 `TransactionUtil` 工具类
+
+适用于需要编程式事务控制的场景。需要 `spring-tx` 的 `PlatformTransactionManager`。
+
+**源码位置**：见 `references/08-transaction-util.md`
+
+**使用示例**：见 `references/08-transaction-util.md`
 
 ## 参考文档（Reference）
 
@@ -154,6 +177,7 @@ TransactionUtil.execute(transactionManager, status -> {
 - **05-type-handling.md** - 数据类型处理（枚举、JSON、日期等）
 - **06-source-api.md** - 源码级 API 参考（QueryMethods、QueryWrapper、ChainQuery 完整方法列表）
 - **07-optional-field.md** - OptionalField 三态值类型（部分更新场景）
+- **08-transaction-util.md** - TransactionUtil 事务工具类源码
 
 ## 常用导入（Common Imports）
 
@@ -169,7 +193,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 
 // APT 生成的 TableDef
-import static com.your.package.entity.table.AccountTableDef.ACCOUNT;
+import static com.example.common.entity.table.AccountTableDef.ACCOUNT;
 
 // SQL 函数（SQL Functions）
 import com.mybatisflex.core.query.QueryMethods;

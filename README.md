@@ -117,7 +117,7 @@ import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
 
 // APT 生成的 TableDef
-import static com.your.package.entity.table.AccountTableDef.ACCOUNT;
+import static com.example.common.entity.table.AccountTableDef.ACCOUNT;
 
 // SQL 函数
 import com.mybatisflex.core.query.QueryMethods;

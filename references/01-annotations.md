@@ -182,7 +182,7 @@ public class AccountTableDef extends TableDef {
 使用静态导入：
 
 ```java
-import static com.your.package.entity.table.AccountTableDef.ACCOUNT;
+import static com.example.common.entity.table.AccountTableDef.ACCOUNT;
 
 // 类型安全查询
 QueryWrapper.create()
