@@ -101,9 +101,14 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 |------|------|
 | [01-annotations.md](references/01-annotations.md) | 实体注解详解（@Table、@Id、@Column、@Relation 等） |
 | [02-querywrapper-advanced.md](references/02-querywrapper-advanced.md) | QueryWrapper 高级用法（多表关联、子查询、SQL 函数等） |
-| [03-base-entities.md](references/03-base-entities.md) | 基础实体类与配置（BaseEntity、UUIDv7、自动填充、TransactionUtil） |
+| [02a-querychain.md](references/02a-querychain.md) | QueryChain 链式查询（链式调用封装，直接返回结果） |
+| [03-base-entities.md](references/03-base-entities.md) | 基础实体类与配置（BaseEntity、UUIDv7、自动填充） |
 | [04-service-mapper.md](references/04-service-mapper.md) | Service 与 Mapper 操作参考 |
 | [05-type-handling.md](references/05-type-handling.md) | 数据类型处理（枚举、JSON、日期等） |
+| [06-source-api.md](references/06-source-api.md) | 核心源码解析（QueryMethods SQL 函数、高级特性等） |
+| [07-optional-field.md](references/07-optional-field.md) | OptionalField 三态值类型（部分更新场景） |
+| [07-1-optional-field-source.md](references/07-1-optional-field-source.md) | OptionalField 源码实现 |
+| [08-transaction-util.md](references/08-transaction-util.md) | TransactionUtil 事务工具类（简化编程式事务管理） |
 
 ## 📋 常用导入
 

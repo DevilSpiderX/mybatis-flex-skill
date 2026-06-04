@@ -101,9 +101,14 @@ See the `references/` directory for details:
 |----------|-------------|
 | [01-annotations.md](references/01-annotations.md) | Entity annotations (@Table, @Id, @Column, @Relation, etc.) |
 | [02-querywrapper-advanced.md](references/02-querywrapper-advanced.md) | QueryWrapper advanced usage (multi-table joins, subqueries, SQL functions, etc.) |
-| [03-base-entities.md](references/03-base-entities.md) | Base entity classes & configuration (BaseEntity, UUIDv7, auto-fill, TransactionUtil) |
+| [02a-querychain.md](references/02a-querychain.md) | QueryChain chained queries (chain call wrapper, direct result returns) |
+| [03-base-entities.md](references/03-base-entities.md) | Base entity classes & configuration (BaseEntity, UUIDv7, auto-fill) |
 | [04-service-mapper.md](references/04-service-mapper.md) | Service and Mapper operation reference |
 | [05-type-handling.md](references/05-type-handling.md) | Data type handling (enums, JSON, dates, etc.) |
+| [06-source-api.md](references/06-source-api.md) | Core source code analysis (QueryMethods SQL functions, advanced features, etc.) |
+| [07-optional-field.md](references/07-optional-field.md) | OptionalField tri-state type (partial update scenarios) |
+| [07-1-optional-field-source.md](references/07-1-optional-field-source.md) | OptionalField source code implementation |
+| [08-transaction-util.md](references/08-transaction-util.md) | TransactionUtil transaction utility class (simplified programmatic transaction management) |
 
 ## 📋 Common Imports
 
