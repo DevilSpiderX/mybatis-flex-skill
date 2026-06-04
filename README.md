@@ -1,6 +1,6 @@
 # MyBatis-Flex 开发技能
 
-[English](#english) | 中文
+[English](README.en.md) | 中文
 
 一个 LobeHub Skill，为使用 MyBatis-Flex 框架编写 Java 持久层代码提供智能辅助。
 
@@ -125,18 +125,93 @@ import com.mybatisflex.core.query.QueryMethods;
 
 ## 🛠️ 安装与使用
 
-### 作为 LobeHub Skill 安装
+### 配置要求
+
+- Java 17+
+- MyBatis-Flex 1.9+
+- Spring Boot 3.x
+
+### 安装方式
+
+本技能遵循 [Agent Skills 开放标准](https://agentskills.io/)，支持多种 AI 编程工具。
+
+> **💡 快速安装**：将整个项目目录（包含 `SKILL.md` 和 `references/`）复制到对应工具的 skills 目录下。
+>
+> ⚠️ **注意**：`references/` 目录包含核心参考文档，必须随 `SKILL.md` 一起安装，否则技能无法正常工作。
+
+#### Claude Code
+
+```bash
+# 项目级别（推荐，随项目版本控制）
+cp -r . /path/to/your-project/.claude/skills/mybatis-flex-skill
+
+# 或用户全局级别（所有项目可用）
+cp -r . ~/.claude/skills/mybatis-flex-skill
+```
+
+也可在项目根目录的 `CLAUDE.md` 中导入：
+
+```markdown
+@.claude/skills/mybatis-flex-skill/SKILL.md
+```
+
+#### Codex (OpenAI)
+
+```bash
+# 项目级别（推荐）
+cp -r . /path/to/your-project/.agents/skills/mybatis-flex-skill
+
+# 或用户全局级别
+cp -r . ~/.agents/skills/mybatis-flex-skill
+```
+
+也可通过 Codex CLI 内置的 `$skill-installer` 安装（如果技能已发布到社区）。
+
+#### OpenCode
+
+```bash
+# 项目级别（推荐）
+cp -r . /path/to/your-project/.opencode/skills/mybatis-flex-skill
+
+# 或用户全局级别
+cp -r . ~/.config/opencode/skills/mybatis-flex-skill
+```
+
+> **📝 说明**：OpenCode 同时兼容 `.claude/skills/` 和 `.agents/skills/` 路径，如果你已经为 Claude Code 或 Codex 安装过，OpenCode 会自动发现。
+
+#### LobeHub
 
 ```bash
 # 通过 LobeHub 市场安装
 lobe skill install mybatis-flex-skill
 ```
 
-### 配置要求
+### 安装目录速查
 
-- Java 17+
-- MyBatis-Flex 1.9+
-- Spring Boot 3.x
+| 工具 | 项目级路径 | 全局路径 |
+|------|-----------|---------|
+| Claude Code | `.claude/skills/mybatis-flex-skill/` | `~/.claude/skills/mybatis-flex-skill/` |
+| Codex | `.agents/skills/mybatis-flex-skill/` | `~/.agents/skills/mybatis-flex-skill/` |
+| OpenCode | `.opencode/skills/mybatis-flex-skill/` | `~/.config/opencode/skills/mybatis-flex-skill/` |
+| LobeHub | 通过 LobeHub 市场安装 | — |
+
+安装后目录结构应如下：
+
+```
+mybatis-flex-skill/
+├── SKILL.md
+└── references/
+    ├── 01-annotations.md
+    ├── 02-querywrapper-advanced.md
+    ├── 02a-querychain.md
+    ├── 03-base-entities.md
+    ├── 04-service-mapper.md
+    ├── 05-type-handling.md
+    ├── 06-source-api.md
+    ├── 07-optional-field.md
+    ├── 07-1-optional-field-source.md
+    └── 08-transaction-util.md
+```
 
 ### APT 配置
 
@@ -189,31 +264,5 @@ TransactionUtil.execute(transactionManager, status -> {
 欢迎提交 Issue 和 Pull Request！
 
 ## 📄 许可证
-
-MIT License
-
----
-
-<a name="english"></a>
-## English
-
-# MyBatis-Flex Development Skill
-
-A LobeHub Skill that provides intelligent assistance for writing Java persistence layer code using the MyBatis-Flex framework.
-
-### Features
-
-- Entity class definition
-- CRUD operations
-- Chain queries
-- Association queries
-- Batch operations
-- Transaction management
-
-### Documentation
-
-See the `references/` directory for detailed documentation.
-
-### License
 
 MIT License
