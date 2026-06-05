@@ -25,6 +25,60 @@ public class Account extends BaseEntity {
 
 APT 自动生成 TableDef 类（如 `ACCOUNT`），用于类型安全查询。
 
+> 💡 **推荐配置**：启用 APT 自动生成 Mapper 接口，避免手动编写。在 `mybatis-flex.config` 中配置 `processor.mapper.generateEnable=true` 和 `processor.mapper.annotation=true`，并在 `pom.xml` 中添加 `mybatis-flex-processor`。
+
+## APT 代码生成（推荐）
+
+MyBatis-Flex 通过 APT 在编译期自动生成 `TableDef` 类和 `Mapper` 接口。
+
+### 配置方式
+
+**1. 创建 `mybatis-flex.config` 文件（项目根目录）：**
+```properties
+# mybatis-flex.config
+
+# 启用 Mapper 接口自动生成
+processor.mapper.generateEnable=true
+
+# 生成的 Mapper 添加 @Mapper 注解
+processor.mapper.annotation=true
+
+# 指定实体类包路径
+processor.mapper.generateInclude=com.example.entity.*
+```
+
+**2. Maven 依赖：**
+```xml
+<dependency>
+    <groupId>com.mybatisflex</groupId>
+    <artifactId>mybatis-flex-processor</artifactId>
+    <version>${mybatis-flex.version}</version>
+    <scope>provided</scope>
+</dependency>
+```
+
+### 生成内容
+
+| 生成物 | 说明 | 示例 |
+|--------|------|------|
+| `TableDef` | 类型安全的列引用 | `ACCOUNT.AGE.ge(18)` |
+| `Mapper` | 继承 BaseMapper 的接口 | `AccountMapper extends BaseMapper<Account>` |
+
+### 使用示例
+
+```java
+// 静态导入 TableDef
+import static com.example.entity.table.AccountTableDef.ACCOUNT;
+
+// 类型安全查询
+List<Account> accounts = accountMapper.queryChain()
+    .where(ACCOUNT.AGE.ge(18))
+    .and(ACCOUNT.USER_NAME.like("michael"))
+    .list();
+```
+
+> 详细配置请参考 `references/00-apt-configuration.md`
+
 ## 链式操作（Chain Operations）- 优先使用
 
 ### QueryChain 查询
@@ -169,6 +223,7 @@ public class OrderService {
 
 详细信息请查阅 `references/` 目录：
 
+- **00-apt-configuration.md** - APT 代码生成配置（TableDef、Mapper 自动生成）
 - **01-annotations.md** - 实体注解详解（@Table、@Id、@Column、@Relation 等）
 - **02-querywrapper-advanced.md** - QueryWrapper 高级用法（多表关联、子查询、SQL 函数等）
 - **02a-querychain.md** - QueryChain 链式查询详解（基于 QueryWrapper，提供 one/list/page/obj 等便捷方法）

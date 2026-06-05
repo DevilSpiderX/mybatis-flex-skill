@@ -99,6 +99,7 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 
 | 文档 | 说明 |
 |------|------|
+| [00-apt-configuration.md](references/00-apt-configuration.md) | APT 代码生成配置（TableDef、Mapper 自动生成） |
 | [01-annotations.md](references/01-annotations.md) | 实体注解详解（@Table、@Id、@Column、@Relation 等） |
 | [02-querywrapper-advanced.md](references/02-querywrapper-advanced.md) | QueryWrapper 高级用法（多表关联、子查询、SQL 函数等） |
 | [02a-querychain.md](references/02a-querychain.md) | QueryChain 链式查询（链式调用封装，直接返回结果） |

@@ -236,18 +236,3 @@ public class MybatisFlexConfig {
 **源码位置**：见 `08-transaction-util.md`
 
 **使用示例**：见 `08-transaction-util.md`
-
-## 推荐配置
-
-```properties
-# mybatis-flex.config
-processor.enable=true
-processor.mapper.generateEnable=true
-processor.mapper.annotation=true
-```
-
-| 配置项                            | 说明                 |
-| --------------------------------- | -------------------- |
-| `processor.enable`                | 启用 APT 开关        |
-| `processor.mapper.generateEnable` | APT 开启 Mapper 生成 |
-| `processor.mapper.annotation`     | 开启 @Mapper 注解    |

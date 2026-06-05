@@ -47,6 +47,38 @@ public class Account extends BaseEntity {
 
 APT automatically generates TableDef classes for type-safe queries.
 
+> 💡 **Recommended**: Enable APT auto-generation of Mapper interfaces. Configure `processor.mapper.generateEnable=true` and `processor.mapper.annotation=true` in `mybatis-flex.config`.
+
+### APT Code Generation (Recommended)
+
+MyBatis-Flex uses APT to automatically generate `TableDef` classes and `Mapper` interfaces at compile time.
+
+**Configuration (`mybatis-flex.config` in project root):**
+```properties
+# mybatis-flex.config
+
+# Enable Mapper interface auto-generation
+processor.mapper.generateEnable=true
+
+# Add @Mapper annotation to generated Mapper
+processor.mapper.annotation=true
+
+# Specify entity class package path
+processor.mapper.generateInclude=com.example.entity.*
+```
+
+**Maven dependency:**
+```xml
+<dependency>
+    <groupId>com.mybatisflex</groupId>
+    <artifactId>mybatis-flex-processor</artifactId>
+    <version>${mybatis-flex.version}</version>
+    <scope>provided</scope>
+</dependency>
+```
+
+> See `references/00-apt-configuration.md` for details.
+
 ### Service Layer Best Practices
 
 > ⚠️ **Important Limitation**: ServiceImpl **cannot** extend IService. Inject Mapper directly.
@@ -99,6 +131,7 @@ See the `references/` directory for details:
 
 | Document | Description |
 |----------|-------------|
+| [00-apt-configuration.md](references/00-apt-configuration.md) | APT code generation configuration (TableDef, Mapper auto-generation) |
 | [01-annotations.md](references/01-annotations.md) | Entity annotations (@Table, @Id, @Column, @Relation, etc.) |
 | [02-querywrapper-advanced.md](references/02-querywrapper-advanced.md) | QueryWrapper advanced usage (multi-table joins, subqueries, SQL functions, etc.) |
 | [02a-querychain.md](references/02a-querychain.md) | QueryChain chained queries (chain call wrapper, direct result returns) |
