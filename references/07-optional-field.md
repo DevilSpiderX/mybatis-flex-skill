@@ -12,6 +12,15 @@
 | null | `NULL` | 字段存在但为 null | `set(field, null)` |
 | 缺失 | `MISSING` | 字段不存在 | 忽略，不调用 set |
 
+## 与 Optional 的区别
+
+| 特性 | Optional | OptionalField |
+|------|----------|---------------|
+| 状态数量 | 二元（present/absent） | 三态（VALUE/NULL/MISSING） |
+| 区分 null 和缺失 | ❌ 不支持 | ✅ 支持 |
+| 三分支匹配 | ❌ 不支持 | ✅ 支持（match 方法） |
+| 按状态返回默认值 | ❌ 不支持 | ✅ 支持（orElse 双参数） |
+
 ## 使用场景
 
 在 REST API 的 PATCH 请求中，区分"字段未传"和"字段传了 null"：
@@ -43,12 +52,64 @@
 }
 ```
 
-## 源码实现
+## API 参考
 
-完整的源码实现请参考 [07-1-optional-field-source.md](07-1-optional-field-source.md)，包含：
+### 创建方法
 
-- `OptionalField` 类 - 三态值类型核心实现
-- `OptionalDtoUtil` 工具类 - DTO 转换为 UpdateEntity
+| 方法 | 说明 | 示例 |
+|------|------|------|
+| `OptionalField.missing()` | 创建 MISSING 状态 | `OptionalField.missing()` |
+| `OptionalField._null()` | 创建 NULL 状态 | `OptionalField._null()` |
+| `OptionalField.of(value)` | 创建 VALUE 状态（null 值自动转为 NULL） | `OptionalField.of("hello")` |
+| `OptionalField.of(field)` | 包装可能为 null 的 OptionalField | `OptionalField.of(field)` |
+
+### 状态判断
+
+| 方法 | 说明 | 返回值 |
+|------|------|--------|
+| `isPresent()` | 是否有值（VALUE 状态） | `boolean` |
+| `isNull()` | 是否为 NULL 状态 | `boolean` |
+| `isMissing()` | 是否为 MISSING 状态 | `boolean` |
+| `isEmpty()` | 是否为空（NULL 或 MISSING） | `boolean` |
+| `getState()` | 获取当前状态枚举 | `State` |
+
+### 获取值
+
+| 方法 | 说明 |
+|------|------|
+| `getValue()` | 获取原始值（可能为 null） |
+| `orElse(other)` | 获取值，无值时返回默认值 |
+| `orElse(nullVal, missingVal)` | 获取值，按 NULL/MISSING 返回不同默认值 |
+| `orElseThrow()` | 获取值，无值时抛出 NoSuchElementException |
+| `orElseThrow(supplier)` | 获取值，无值时抛出自定义异常 |
+| `orElseGet(supplier)` | 获取值，无值时通过 Supplier 延迟计算 |
+| `orElseGet(nullSup, missingSup)` | 获取值，按状态通过不同 Supplier 计算 |
+
+### 条件操作
+
+| 方法 | 说明 |
+|------|------|
+| `ifPresent(action)` | 有值时执行 Consumer |
+| `ifNull(action)` | NULL 状态时执行 Runnable |
+| `ifMissing(action)` | MISSING 状态时执行 Runnable |
+| `ifEmpty(action)` | 为空时执行 Runnable（NULL 或 MISSING） |
+
+### 模式匹配
+
+| 方法签名 | 说明 |
+|----------|------|
+| `match(Consumer, Runnable)` | 双分支匹配（忽略 MISSING） |
+| `match(Consumer, Runnable, Runnable)` | 三分支匹配（无返回值） |
+| `match(Function, Supplier, Supplier)` | 三分支匹配（有返回值） |
+
+### 链式转换
+
+| 方法 | 说明 |
+|------|------|
+| `map(Function)` | 有值时转换，无值时保持状态 |
+| `flatMap(Function)` | 有值时展平嵌套 OptionalField |
+| `filter(Predicate)` | 有值且满足谓词时保持，否则转为 NULL |
+| `stream()` | 转换为 Stream（有值时为单元素流） |
 
 ## 使用示例
 
@@ -71,7 +132,100 @@ public class UserUpdateDTO {
 }
 ```
 
-### 2. Service 层使用
+### 2. 状态判断与获取值
+
+```java
+OptionalField<String> field = ...;
+
+// 状态判断
+if (field.isPresent()) {
+    // VALUE 状态
+} else if (field.isNull()) {
+    // NULL 状态（字段存在但值为 null）
+} else if (field.isMissing()) {
+    // MISSING 状态（字段不存在）
+}
+
+// 或使用 isEmpty() 统一判断
+if (field.isEmpty()) {
+    // NULL 或 MISSING 状态
+}
+
+// 获取值
+String value = field.orElse("默认值");
+
+// 区分 NULL 和 MISSING 返回不同默认值
+String value = field.orElse("字段为null时的默认值", "字段不存在时的默认值");
+
+// 必须有值时使用
+String value = field.orElseThrow();
+String value = field.orElseThrow(() -> new BusinessException("name 字段必填"));
+```
+
+### 3. 条件操作
+
+```java
+OptionalField<String> nickname = user.getOptionalNickname();
+
+// 有值时执行
+nickname.ifPresent(name -> log.info("昵称: {}", name));
+
+// NULL 状态时执行
+nickname.ifNull(() -> log.warn("昵称字段为 null"));
+
+// MISSING 状态时执行
+nickname.ifMissing(() -> log.warn("昵称字段缺失"));
+
+// 为空时执行（NULL 或 MISSING）
+nickname.ifEmpty(() -> log.warn("昵称不可用"));
+```
+
+### 4. 模式匹配
+
+```java
+OptionalField<String> status = record.getOptionalStatus();
+
+// 双分支匹配（忽略 MISSING）
+status.match(
+    value -> log.info("状态: {}", value),     // VALUE
+    () -> log.warn("状态为 null")              // NULL
+);
+
+// 三分支匹配
+status.match(
+    value -> log.info("状态: {}", value),     // VALUE
+    () -> log.warn("状态为 null"),             // NULL
+    () -> log.warn("状态字段缺失")              // MISSING
+);
+
+// 带返回值的三分支匹配
+String display = status.match(
+    value -> "状态: " + value,                 // VALUE
+    () -> "状态未设置",                         // NULL
+    () -> "状态字段缺失"                        // MISSING
+);
+```
+
+### 5. 链式转换
+
+```java
+OptionalField<String> email = user.getOptionalEmail();
+
+// map 转换
+OptionalField<String> upperEmail = email.map(String::toUpperCase);
+String display = upperEmail.orElse("N/A");
+
+// flatMap 展平嵌套
+OptionalField<OptionalField<String>> nested = ...;
+OptionalField<String> flat = nested.flatMap(Function.identity());
+
+// filter 过滤
+OptionalField<String> validEmail = email.filter(e -> e.contains("@"));
+// 如果 email 存在但不包含 @，validEmail 变为 NULL 状态
+// 如果 email 字段不存在，validEmail 保持 MISSING 状态
+```
+
+### 6. Service 层使用
 
 ```java
 @Service
@@ -92,7 +246,7 @@ public class UserService {
 }
 ```
 
-### 3. Controller 层使用
+### 7. Controller 层使用
 
 ```java
 @RestController
@@ -114,7 +268,7 @@ public class UserController {
 }
 ```
 
-### 4. JSON 请求示例
+### 8. JSON 请求示例
 
 ```json
 // 请求 1：只更新 age
@@ -136,7 +290,7 @@ public class UserController {
 }
 ```
 
-### 5. 配合 UpdateChain 使用
+### 9. 配合 UpdateChain 使用
 
 > ⚠️ **重要**：在 `where`、`set` 等方法中，**推荐使用 APT 生成的 `QueryColumn`**（如 `USER.ID`、`USER.NAME`），而不是 Lambda（如 `User::getId`）。
 
@@ -170,7 +324,21 @@ public void updateUserWithChain(String userId, UserUpdateDTO dto) {
 }
 ```
 
-### 6. Record 类型 DTO
+### 10. 使用 OptionalDtoUtil 简化
+
+```java
+public void updateUserWithUtil(String userId, UserUpdateDTO dto) {
+    UpdateChain chain = UpdateChain.of(User.class)
+        .where(USER.ID.eq(userId));
+
+    // 使用工具类自动处理所有 OptionalField 字段
+    OptionalDtoUtil.applyToChain(dto, chain);
+
+    chain.update();
+}
+```
+
+### 11. Record 类型 DTO
 
 ```java
 public record UserUpdateRecord(
@@ -193,15 +361,12 @@ public record UserUpdateRecord(
 2. **字段默认值**：DTO 中的 `OptionalField` 字段应默认设置为 `OptionalField.missing()`
 3. **null 安全**：使用 `OptionalField.of(value)` 时，如果 value 为 null，会自动转换为 `NULL` 状态
 4. **类型安全**：`OptionalField` 是泛型类型，确保类型正确
+5. **filter 语义**：`filter` 方法在谓词不满足时返回 `NULL`（而非 `MISSING`），保留了"字段存在但值无效"的语义
 
 ## 与其他框架的对比
 
 | 概念 | JavaScript | JSON | OptionalField |
 |------|------------|------|---------------|
-| 有值 | `value` | `{"field": value}` | `OptionalField.of(value)` |
-| null | `null` | `{"field": null}` | `OptionalField._null()` |
-| 不存在 | `undefined` | 字段不存在 | `OptionalField.missing()` |
-
-## 相关文档
-
-- [07-1-optional-field-source.md](07-1-optional-field-source.md) - 源码实现
+| 字段不存在 | `undefined` | 字段缺失 | `MISSING` |
+| 字段为 null | `null` | `null` | `NULL` |
+| 字段有值 | 任意值 | 任意值 | `VALUE` |
