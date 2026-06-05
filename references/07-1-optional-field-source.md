@@ -652,111 +652,227 @@ public class OptionalField<T> {
 ## OptionalDtoUtil 工具类
 
 ```java
-package com.example.json.lang;
+package com.example.mybatisflex.util;
 
-import com.mybatisflex.core.update.UpdateChain;
-import com.mybatisflex.core.update.UpdateEntity;
+import com.mybatisflex.core.util.UpdateEntity;
+import com.example.json.lang.OptionalField;
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
+import lombok.extern.slf4j.Slf4j;
 
-import java.lang.reflect.Field;
+import java.beans.IntrospectionException;
+import java.beans.Introspector;
+import java.beans.PropertyDescriptor;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+import java.lang.reflect.RecordComponent;
+import java.util.Arrays;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 
 /**
- * OptionalField DTO 转换工具类
+ * DTO 转换为 MyBatis-Flex UpdateEntity 的工具类
+ * <p>
+ * 支持 OptionalField 类型，用于区分「字段未传」和「字段传了 null」
  *
  * @author DevilSpiderX
  */
+@Slf4j
 public class OptionalDtoUtil {
+
+    /**
+     * PropertyDescriptor 缓存：避免重复反射获取
+     */
+    private static final ConcurrentHashMap<Class<?>, Map<String, PropertyDescriptor>> PROPERTY_DESCRIPTOR_CACHE = new ConcurrentHashMap<>();
+
+    /**
+     * Source getter 缓存：避免重复反射获取
+     */
+    private static final ConcurrentHashMap<Class<?>, Map<String, Method>> SOURCE_GETTER_CACHE = new ConcurrentHashMap<>();
 
     private OptionalDtoUtil() {
     }
 
     /**
-     * 将包含 OptionalField 字段的 DTO 转换为 UpdateEntity
+     * 将 DTO 转换为 UpdateEntity（无 ID）
      *
-     * @param dto     DTO 对象
-     * @param clazz   实体类
-     * @param id      实体 ID
-     * @param <T>     实体类型
-     * @return UpdateEntity 实例
+     * @param dto   源 DTO 对象，支持普通类和 Record
+     * @param clazz 目标实体类型
+     * @param <R>   目标实体类型
+     * @return 转换后的 UpdateEntity，dto 为 null 时返回 null
      */
-    public static <T> T toUpdateEntity(Object dto, Class<T> clazz, Object id) {
-        T entity = UpdateEntity.of(clazz, id);
-        Field[] fields = dto.getClass().getDeclaredFields();
+    public static <R> R toUpdateEntity(final @Nullable Object dto, final @Nonnull Class<R> clazz) {
+        return toUpdateEntity(dto, clazz, null);
+    }
 
-        for (Field field : fields) {
-            field.setAccessible(true);
-            try {
-                Object value = field.get(dto);
-                if (value instanceof OptionalField<?> optionalField) {
-                    String fieldName = field.getName();
-                    Field entityField = findField(clazz, fieldName);
+    /**
+     * 将 DTO 转换为 UpdateEntity（带 ID）
+     *
+     * @param dto   源 DTO 对象，支持普通类和 Record
+     * @param clazz 目标实体类型
+     * @param id    记录 ID，为 null 时不设置 ID
+     * @param <R>   目标实体类型
+     * @return 转换后的 UpdateEntity，dto 为 null 时返回 null
+     */
+    public static <R> R toUpdateEntity(
+            final @Nullable Object dto,
+            final @Nonnull Class<R> clazz,
+            final @Nullable Object id
+    ) {
+        Objects.requireNonNull(clazz, "目标实体类型 clazz 不能为 null");
 
-                    if (entityField != null) {
-                        entityField.setAccessible(true);
-                        optionalField.match(
-                            v -> {
-                                try {
-                                    entityField.set(entity, v);
-                                } catch (IllegalAccessException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            },
-                            () -> {
-                                try {
-                                    entityField.set(entity, null);
-                                } catch (IllegalAccessException e) {
-                                    throw new RuntimeException(e);
-                                }
-                            },
-                            () -> {} // MISSING: 不设置
-                        );
-                    }
+        if (dto == null) {
+            return null;
+        }
+
+        log.debug("开始转换: {} -> {}, id={}", dto.getClass().getSimpleName(), clazz.getSimpleName(), id);
+
+        final R entity = (id == null) ? UpdateEntity.of(clazz) : UpdateEntity.of(clazz, id);
+
+        try {
+            final var targetPds = getPropertyDescriptorMap(clazz);
+            final var sourceGetterMap = buildSourceGetterMap(dto);
+
+            int convertedCount = 0;
+            int skippedCount = 0;
+
+            for (final var entry : targetPds.entrySet()) {
+                final var propertyName = entry.getKey();
+                final var targetPd = entry.getValue();
+                final var writeMethod = targetPd.getWriteMethod();
+
+                if (writeMethod == null) {
+                    continue;
                 }
-            } catch (IllegalAccessException e) {
-                throw new RuntimeException(e);
+
+                final var readMethod = sourceGetterMap.get(propertyName);
+                if (readMethod == null) {
+                    skippedCount++;
+                    continue;
+                }
+
+                try {
+                    final var value = readMethod.invoke(dto);
+                    applyPropertyValue(
+                            entity,
+                            writeMethod,
+                            value,
+                            targetPd.getPropertyType(),
+                            readMethod.getReturnType()
+                    );
+                    convertedCount++;
+                } catch (InvocationTargetException | IllegalAccessException e) {
+                    throw new IllegalArgumentException(
+                            "属性 %s 转换失败: %s".formatted(propertyName, e.getMessage()),
+                            e
+                    );
+                }
             }
+
+            log.debug("转换完成: {} -> {}, 已转换={}, 已跳过={}", dto.getClass().getSimpleName(), clazz.getSimpleName(), convertedCount, skippedCount);
+
+        } catch (IntrospectionException e) {
+            throw new IllegalArgumentException(
+                    "无法获取 %s 的 BeanInfo: %s".formatted(
+                            dto.getClass().getName(),
+                            e.getMessage()
+                    ), e
+            );
         }
 
         return entity;
     }
 
     /**
-     * 将包含 OptionalField 字段的 DTO 应用到 UpdateChain
-     *
-     * @param dto   DTO 对象
-     * @param chain UpdateChain 实例
+     * 获取目标类的属性描述符 Map（带缓存）
      */
-    public static void applyToChain(Object dto, UpdateChain<?> chain) {
-        Field[] fields = dto.getClass().getDeclaredFields();
-
-        for (Field field : fields) {
-            field.setAccessible(true);
+    @Nonnull
+    private static Map<String, PropertyDescriptor> getPropertyDescriptorMap(final @Nonnull Class<?> clazz) throws IntrospectionException {
+        return PROPERTY_DESCRIPTOR_CACHE.computeIfAbsent(clazz, k -> {
             try {
-                Object value = field.get(dto);
-                if (value instanceof OptionalField<?> optionalField) {
-                    String fieldName = field.getName();
-                    optionalField.match(
-                        v -> chain.set(fieldName, v),
-                        () -> chain.set(fieldName, null),
-                        () -> {} // MISSING: 不设置
-                    );
+                return Arrays.stream(Introspector.getBeanInfo(k, Object.class).getPropertyDescriptors())
+                        .collect(Collectors.toMap(PropertyDescriptor::getName, Function.identity()));
+            } catch (IntrospectionException e) {
+                throw new RuntimeException("无法获取 %s 的 BeanInfo".formatted(k.getName()), e);
+            }
+        });
+    }
+
+    /**
+     * 构建源对象的 getter 方法 Map（带缓存）
+     * <p>
+     * 支持普通类（通过 PropertyDescriptor）和 Record（通过 getRecordComponents）
+     */
+    @Nonnull
+    private static Map<String, Method> buildSourceGetterMap(final @Nonnull Object dto) throws IntrospectionException {
+        final var dtoClass = dto.getClass();
+
+        return SOURCE_GETTER_CACHE.computeIfAbsent(dtoClass, k -> {
+            if (k.isRecord()) {
+                return Arrays.stream(k.getRecordComponents())
+                        .collect(Collectors.toMap(RecordComponent::getName, RecordComponent::getAccessor));
+            }
+
+            try {
+                return Arrays.stream(Introspector.getBeanInfo(k, Object.class).getPropertyDescriptors())
+                        .filter(pd -> pd.getReadMethod() != null)
+                        .collect(Collectors.toMap(PropertyDescriptor::getName, PropertyDescriptor::getReadMethod));
+            } catch (IntrospectionException e) {
+                throw new RuntimeException("无法获取 %s 的 BeanInfo".formatted(k.getName()), e);
+            }
+        });
+    }
+
+    /**
+     * 应用属性值到目标对象
+     */
+    private static void applyPropertyValue(
+            final @Nonnull Object target,
+            final @Nonnull Method writeMethod,
+            final @Nullable Object value,
+            final @Nonnull Class<?> targetPropertyType,
+            final @Nonnull Class<?> sourceValueType
+    ) throws InvocationTargetException, IllegalAccessException {
+        if (value instanceof OptionalField<?> optionalFieldValue) {
+            if (optionalFieldValue.isPresent()) {
+                writeMethod.invoke(target, optionalFieldValue.getValue());
+            } else if (optionalFieldValue.isNull()) {
+                writeMethod.invoke(target, (Object) null);
+            }
+            // OptionalField 为空（既不是 present 也不是 null）时跳过，不更新
+        } else if (value != null) {
+            // 判断是否需要嵌套转换：目标类型不是简单类型，且源值不是简单类型
+            if (!isSimpleType(targetPropertyType) && !isSimpleType(sourceValueType)) {
+                try {
+                    // 递归转换嵌套对象
+                    final var nestedEntity = toUpdateEntity(value, targetPropertyType);
+                    writeMethod.invoke(target, nestedEntity);
+                } catch (IllegalArgumentException e) {
+                    // 嵌套转换失败时，记录警告并跳过该属性
+                    log.warn("嵌套对象转换失败，跳过属性 [{}]: {}", writeMethod.getName(), e.getMessage());
                 }
-            } catch (IllegalAccessException e) {
-                throw new RuntimeException(e);
+            } else if (targetPropertyType.isAssignableFrom(sourceValueType)) {
+                // 简单类型或兼容类型，直接赋值
+                writeMethod.invoke(target, value);
             }
         }
     }
 
-    private static Field findField(Class<?> clazz, String fieldName) {
-        Class<?> current = clazz;
-        while (current != null && current != Object.class) {
-            try {
-                return current.getDeclaredField(fieldName);
-            } catch (NoSuchFieldException e) {
-                current = current.getSuperclass();
-            }
-        }
-        return null;
+    /**
+     * 判断是否为简单类型
+     * <p>
+     * 简单类型包括：基本类型、包装类型、String、枚举、java.util.Date、java.time.* 等
+     */
+    private static boolean isSimpleType(final @Nonnull Class<?> clazz) {
+        return clazz.isPrimitive()
+                || clazz.getName().startsWith("java.lang.")
+                || clazz.getName().startsWith("java.time.")
+                || clazz.getName().startsWith("java.util.")
+                || clazz.isEnum();
     }
+
 }
 ```

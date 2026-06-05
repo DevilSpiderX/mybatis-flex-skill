@@ -328,17 +328,15 @@ public void updateUserWithChain(String userId, UserUpdateDTO dto) {
 
 ```java
 public void updateUserWithUtil(String userId, UserUpdateDTO dto) {
-    UpdateChain chain = UpdateChain.of(User.class)
-        .where(USER.ID.eq(userId));
-
-    // 使用工具类自动处理所有 OptionalField 字段
-    OptionalDtoUtil.applyToChain(dto, chain);
-
-    chain.update();
+    // 转换 DTO 为 UpdateEntity
+    User updateEntity = OptionalDtoUtil.toUpdateEntity(dto, User.class, userId);
+    
+    // 执行更新
+    userMapper.update(updateEntity);
 }
 ```
 
-### 11. Record 类型 DTO
+**支持 Record 类型 DTO：**
 
 ```java
 public record UserUpdateRecord(
@@ -347,13 +345,21 @@ public record UserUpdateRecord(
     OptionalField<String> email
 ) {
     public UserUpdateRecord {
-        // 默认值
         if (name == null) name = OptionalField.missing();
         if (age == null) age = OptionalField.missing();
         if (email == null) email = OptionalField.missing();
     }
 }
+
+// 使用方式相同
+User updateEntity = OptionalDtoUtil.toUpdateEntity(record, User.class, userId);
 ```
+
+**OptionalDtoUtil 特性：**
+- 支持普通类和 Record 类型 DTO
+- 自动缓存 PropertyDescriptor 和 Getter 方法，避免重复反射
+- 支持嵌套对象递归转换
+- 自动识别 OptionalField 类型字段
 
 ## 注意事项
 
