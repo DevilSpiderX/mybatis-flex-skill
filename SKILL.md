@@ -1,255 +1,76 @@
 ---
 name: mybatis-flex-skill
 description: >-
-  MyBatis-Flex 开发技能。当用户请求涉及 MyBatis-Flex 框架时激活，
-  包括编写代码、检查代码、优化代码、代码重构、问题排查、代码解释、
-  最佳实践咨询、版本迁移等场景，涵盖实体类定义、CRUD 操作、
-  链式查询、关联查询、批量操作等。
+  MyBatis-Flex 开发技能。当用户请求涉及 MyBatis-Flex 框架、MyBatis-Flex
+  代码生成、Mapper/Service 持久层、QueryWrapper、QueryChain、UpdateChain、
+  DbChain、UpdateEntity、部分字段更新、动态条件更新、字段判空后更新、
+  CRUD、基础查询、自动映射、关联查询、批量操作、Db + Row、Active Record、
+  IService、SpringBoot 配置、MyBatisFlexCustomizer、逻辑删除、乐观锁、
+  数据填充、数据脱敏、数据缓存、SQL 审计、SQL 打印、多数据源、读写分离、
+  数据源加密、动态表名、事务、数据权限、字段权限、字段加密、字典回写、
+  枚举属性、多租户、注解映射、APT 配置、版本迁移、最佳实践咨询、
+  代码检查、优化、重构、问题排查或代码解释时激活。
 ---
 
 # MyBatis-Flex 开发技能
 
-优先使用链式操作（Chain Operations）：QueryChain、UpdateChain、DbChain。
+## 工作方式
 
-## Entity 实体类定义
+1. 先识别任务主题，再只读取对应 reference；不要一次性加载全部文档。
+2. 优先复用项目既有 Mapper、Service、DTO、异常、事务和权限模式。
+3. 默认优先链式操作：查询用 `QueryChain` / `QueryWrapper`，更新用 `UpdateChain`，无实体或通用 SQL 再考虑 `Db + Row`。
+4. 涉及 API、DTO、SQL、数据库字段、权限、租户、事务、数据源、动态表名、审计、加密时，先梳理完整调用链和影响范围。
+5. 保持最小、安全、可回滚修改；未明确要求不新增依赖、不迁移数据、不改变公共契约。
 
-```java
-@Table("tb_account")
-public class Account extends BaseEntity {
-    @Id(keyType = KeyType.Generator, value = UUIDv7KeyGenerator.NAME)
-    private String id;
-    private String userName;
-    private Integer age;
-}
-```
+## 快速路由
 
-APT 自动生成 TableDef 类（如 `ACCOUNT`），用于类型安全查询。
+| 任务主题 | 优先读取 |
+|----------|----------|
+| 官网功能地图、选 reference | `references/00-index.md` |
+| APT、TableDef、Mapper 生成 | `references/01-apt-configuration.md` |
+| `@Table`、`@Id`、`@Column`、Relations 注解 | `references/02-annotations.md` |
+| CRUD、基础查询、自动映射、关联、批量、Db + Row、Active Record、IService、配置 | `references/03-basic-features.md` |
+| QueryWrapper、多表、子查询、SQL 函数、动态条件 | `references/04-querywrapper-advanced.md` |
+| QueryChain 查询、分页、VO/DTO 映射查询 | `references/05-querychain.md` |
+| UpdateChain、条件 `set`、`setRaw`、部分更新 | `references/06-updatechain.md` |
+| 逻辑删除、乐观锁、填充、权限、多租户、动态表名、多数据源、审计 | `references/07-core-features.md` |
+| BaseEntity、UUIDv7、自动填充基础配置 | `references/08-base-entities.md` |
+| Service 与 Mapper 分层、常用 CRUD 封装 | `references/09-service-mapper.md` |
+| 枚举、JSON、日期等类型处理 | `references/10-type-handling.md` |
+| 源码级 API、完整方法列表 | `references/11-source-api.md` |
+| PATCH/部分更新三态值 | `references/12-optional-field.md` |
+| OptionalField 源码实现 | `references/12a-optional-field-source.md` |
+| 编程式事务工具 | `references/13-transaction-util.md` |
 
-> 💡 **推荐配置**：启用 APT 自动生成 Mapper 接口，避免手动编写。在 `mybatis-flex.config` 中配置 `processor.mapper.generateEnable=true` 和 `processor.mapper.annotation=true`，并在 `pom.xml` 中添加 `mybatis-flex-processor`。
+## 高优先级规则
 
-## APT 代码生成（推荐）
-
-MyBatis-Flex 通过 APT 在编译期自动生成 `TableDef` 类和 `Mapper` 接口。
-
-### 配置方式
-
-**1. 创建 `mybatis-flex.config` 文件（项目根目录）：**
-```properties
-# mybatis-flex.config
-
-# 启用 Mapper 接口自动生成
-processor.mapper.generateEnable=true
-
-# 生成的 Mapper 添加 @Mapper 注解
-processor.mapper.annotation=true
-
-# 指定实体类包路径
-processor.mapper.generateInclude=com.example.entity.*
-```
-
-**2. Maven 依赖：**
-```xml
-<dependency>
-    <groupId>com.mybatisflex</groupId>
-    <artifactId>mybatis-flex-processor</artifactId>
-    <version>${mybatis-flex.version}</version>
-    <scope>provided</scope>
-</dependency>
-```
-
-### 生成内容
-
-| 生成物 | 说明 | 示例 |
-|--------|------|------|
-| `TableDef` | 类型安全的列引用 | `ACCOUNT.AGE.ge(18)` |
-| `Mapper` | 继承 BaseMapper 的接口 | `AccountMapper extends BaseMapper<Account>` |
-
-### 使用示例
+- APT 生成的 `TableDef` 是类型安全查询首选；列引用优先 `ACCOUNT.AGE`，条件判断可用 `If::hasText` 等方法引用。
+- `ServiceImpl` 默认不要继承 `IService`；除非既有项目已经统一使用 IService 风格，否则 Service 直接注入 Mapper。
+- `UpdateChain.set` / `setRaw` 的第三个条件参数支持 `boolean`、`BooleanSupplier`、`Predicate<V>`。
+- “有值才更新”优先：
 
 ```java
-// 静态导入 TableDef
-import static com.example.entity.table.AccountTableDef.ACCOUNT;
-
-// 类型安全查询
-List<Account> accounts = accountMapper.queryChain()
-    .where(ACCOUNT.AGE.ge(18))
-    .and(ACCOUNT.USER_NAME.like("michael"))
-    .list();
-```
-
-> 详细配置请参考 `references/00-apt-configuration.md`
-
-## 链式操作（Chain Operations）- 优先使用
-
-### QueryChain 查询
-
-```java
-// 基本查询
-List<Account> accounts = accountMapper.queryChain()
-    .where(ACCOUNT.AGE.ge(18))
-    .and(ACCOUNT.USER_NAME.like("michael"))
-    .list();
-
-// 查询单条
-Account account = accountMapper.queryChain()
-    .where(ACCOUNT.ID.eq("xxx"))
-    .one();
-
-// 分页查询（Pagination）
-Page<Account> page = accountMapper.queryChain()
-    .where(ACCOUNT.AGE.ge(18))
-    .page(1, 10);
-
-// Lambda 条件
-List<Account> list = accountMapper.queryChain()
-    .where(Account::getId).ge("xxx")
-    .and(Account::getUserName).like("michael")
-    .list();
-```
-
-**常用方法（Common Methods）：** `one()` / `list()` / `page()` / `count()` / `exists()` / `oneAs()` / `listAs()` / `oneWithRelations()` / `listWithRelations()`
-
-### UpdateChain 更新
-
-```java
-// 更新字段
 UpdateChain.of(Account.class)
-    .set(Account::getUserName, "张三")
-    .set(Account::getAge, 25)
-    .where(Account::getId).eq("xxx")
-    .update();
-
-// 原子更新（Atomic Update）
-UpdateChain.of(Account.class)
-    .set(Account::getAge, ACCOUNT.AGE.add(1))
-    .where(Account::getId).ge("xxx")
+    .set(ACCOUNT.USER_NAME, dto.getUserName(), If::hasText)
+    .set(ACCOUNT.AGE, dto.getAge(), If::notNull)
+    .where(ACCOUNT.ID.eq(id))
     .update();
 ```
 
-### DbChain 操作
+- `If::hasText` 表示字符串有非空白文本才生效；`If::notNull` 适合对象、数字、日期，以及空字符串是合法值的字段；`If::notEmpty` 适合集合、数组、Map；`If::noText` 是“为空时才生效”，不是“有值才更新”。
+- 需要显式更新为 `null` 时，不要用普通 null 判空跳过；使用 `UpdateEntity` 或 `OptionalField` 区分“未传字段”和“传了 null”。
+- `setRaw` 只用于数据库表达式、原子增减、函数或受控子查询；禁止拼接未校验用户输入。
+
+## 常用导入
 
 ```java
-// 新增（Insert）
-DbChain.table("tb_account")
-    .set("user_name", "zhang san")
-    .set("age", 18)
-    .save();
-
-// 查询（Select）
-DbChain.table("tb_account")
-    .select("id", "user_name")
-    .where("age > ?", 18)
-    .list();
-```
-
-## BaseMapper 操作
-
-```java
-// 新增（Insert）
-accountMapper.insert(entity);
-accountMapper.insertSelective(entity);  // 忽略 null
-
-// 查询（Select）
-accountMapper.selectOneById("xxx");
-accountMapper.selectAll();
-accountMapper.selectListByQuery(query);
-accountMapper.paginate(1, 10, query);
-
-// 更新（Update）
-accountMapper.update(entity);  // 通过 ID 更新，忽略 null
-accountMapper.updateByQuery(entity, query);
-
-// 删除（Delete）
-accountMapper.deleteById("xxx");
-accountMapper.deleteByQuery(query);
-```
-
-## Service 层
-
-> ⚠️ **重要限制**：ServiceImpl **不能**继承 IService，直接注入 Mapper 使用。
-
-直接注入 Mapper 使用，不继承 IService：
-
-```java
-@Service
-@RequiredArgsConstructor
-public class AccountService {
-    private final AccountMapper accountMapper;
-    
-    public List<Account> list() {
-        return accountMapper.selectAll();
-    }
-    
-    public Account getById(String id) {
-        return accountMapper.selectOneById(id);
-    }
-}
-```
-
-## 事务管理（Transaction Management）
-
-### 方式一：使用 `@Transactional` 注解
-
-推荐在 Service 方法上使用 Spring 的 `@Transactional` 注解：
-
-```java
-@Service
-@RequiredArgsConstructor
-public class OrderService {
-    private final OrderMapper orderMapper;
-    
-    @Transactional
-    public void createOrder(Order order) {
-        orderMapper.insert(order);
-        // 其他数据库操作...
-    }
-    
-    @Transactional(readOnly = true)
-    public Order getOrder(String id) {
-        return orderMapper.selectOneById(id);
-    }
-}
-```
-
-### 方式二：使用 `TransactionUtil` 工具类
-
-适用于需要编程式事务控制的场景。需要 `spring-tx` 的 `PlatformTransactionManager`。
-
-**源码位置**：见 `references/08-transaction-util.md`
-
-**使用示例**：见 `references/08-transaction-util.md`
-
-## 参考文档（Reference）
-
-详细信息请查阅 `references/` 目录：
-
-- **00-apt-configuration.md** - APT 代码生成配置（TableDef、Mapper 自动生成）
-- **01-annotations.md** - 实体注解详解（@Table、@Id、@Column、@Relation 等）
-- **02-querywrapper-advanced.md** - QueryWrapper 高级用法（多表关联、子查询、SQL 函数等）
-- **02a-querychain.md** - QueryChain 链式查询详解（基于 QueryWrapper，提供 one/list/page/obj 等便捷方法）
-- **03-base-entities.md** - 基础实体类与配置（BaseEntity、UUIDv7、自动填充、TransactionUtil）
-- **04-service-mapper.md** - Service 与 Mapper 操作参考
-- **05-type-handling.md** - 数据类型处理（枚举、JSON、日期等）
-- **06-source-api.md** - 源码级 API 参考（QueryMethods、QueryWrapper、ChainQuery 完整方法列表）
-- **07-optional-field.md** - OptionalField 三态值类型（部分更新场景）
-- **08-transaction-util.md** - TransactionUtil 事务工具类源码
-
-## 常用导入（Common Imports）
-
-```java
+import com.mybatisflex.core.query.If;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.query.QueryChain;
 import com.mybatisflex.core.update.UpdateChain;
 import com.mybatisflex.core.update.UpdateEntity;
 import com.mybatisflex.core.row.Db;
 import com.mybatisflex.core.row.DbChain;
-import com.mybatisflex.core.keygen.KeyGeneratorFactory;
-import com.mybatisflex.annotation.Id;
-import com.mybatisflex.annotation.KeyType;
 
-// APT 生成的 TableDef
-import static com.example.common.entity.table.AccountTableDef.ACCOUNT;
-
-// SQL 函数（SQL Functions）
-import com.mybatisflex.core.query.QueryMethods;
+import static com.example.entity.table.AccountTableDef.ACCOUNT;
 ```
