@@ -10,9 +10,19 @@
 
 - 实体类定义
 - CRUD 操作
+- 基础查询
+- 自动映射
 - 链式查询
+- UpdateChain 条件更新
+- 部分字段更新
 - 关联查询
 - 批量操作
+- Db + Row
+- Active Record
+- IService
+- SpringBoot 配置
+- MyBatisFlexCustomizer
+- 逻辑删除、乐观锁、多租户、权限、审计等核心能力
 - 事务管理
 
 ## 🚀 核心特性
@@ -29,6 +39,13 @@ List<Account> accounts = accountMapper.queryChain()
 // UpdateChain 更新
 UpdateChain.of(Account.class)
     .set(Account::getUserName, "张三")
+    .where(Account::getId).eq("xxx")
+    .update();
+
+// 字段有值才更新
+UpdateChain.of(Account.class)
+    .set(Account::getUserName, dto.getUserName(), If::hasText)
+    .set(Account::getAge, dto.getAge(), If::notNull)
     .where(Account::getId).eq("xxx")
     .update();
 ```
@@ -91,7 +108,7 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 }
 ```
 
-> 详细信息请查阅 `references/07-optional-field.md`
+> 详细信息请查阅 `references/12-optional-field.md`
 
 ## 📚 参考文档
 
@@ -99,22 +116,27 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 
 | 文档 | 说明 |
 |------|------|
-| [00-apt-configuration.md](references/00-apt-configuration.md) | APT 代码生成配置（TableDef、Mapper 自动生成） |
-| [01-annotations.md](references/01-annotations.md) | 实体注解详解（@Table、@Id、@Column、@Relation 等） |
-| [02-querywrapper-advanced.md](references/02-querywrapper-advanced.md) | QueryWrapper 高级用法（多表关联、子查询、SQL 函数等） |
-| [02a-querychain.md](references/02a-querychain.md) | QueryChain 链式查询（链式调用封装，直接返回结果） |
-| [03-base-entities.md](references/03-base-entities.md) | 基础实体类与配置（BaseEntity、UUIDv7、自动填充） |
-| [04-service-mapper.md](references/04-service-mapper.md) | Service 与 Mapper 操作参考 |
-| [05-type-handling.md](references/05-type-handling.md) | 数据类型处理（枚举、JSON、日期等） |
-| [06-source-api.md](references/06-source-api.md) | 核心源码解析（QueryMethods SQL 函数、高级特性等） |
-| [07-optional-field.md](references/07-optional-field.md) | OptionalField 三态值类型（部分更新场景） |
-| [07-1-optional-field-source.md](references/07-1-optional-field-source.md) | OptionalField 源码实现 |
-| [08-transaction-util.md](references/08-transaction-util.md) | TransactionUtil 事务工具类（简化编程式事务管理） |
+| [00-index.md](references/00-index.md) | 官网功能地图与当前 references 对照 |
+| [01-apt-configuration.md](references/01-apt-configuration.md) | APT 代码生成配置（TableDef、Mapper 自动生成） |
+| [02-annotations.md](references/02-annotations.md) | 实体注解详解（@Table、@Id、@Column、@Relation 等） |
+| [03-basic-features.md](references/03-basic-features.md) | 官网基础功能用例补齐 |
+| [04-querywrapper-advanced.md](references/04-querywrapper-advanced.md) | QueryWrapper 高级用法（多表关联、子查询、SQL 函数等） |
+| [05-querychain.md](references/05-querychain.md) | QueryChain 链式查询（链式调用封装，直接返回结果） |
+| [06-updatechain.md](references/06-updatechain.md) | UpdateChain 链式更新（条件 set、setRaw、部分更新） |
+| [07-core-features.md](references/07-core-features.md) | 官网核心功能用例补齐 |
+| [08-base-entities.md](references/08-base-entities.md) | 基础实体类与配置（BaseEntity、UUIDv7、自动填充） |
+| [09-service-mapper.md](references/09-service-mapper.md) | Service 与 Mapper 操作参考 |
+| [10-type-handling.md](references/10-type-handling.md) | 数据类型处理（枚举、JSON、日期等） |
+| [11-source-api.md](references/11-source-api.md) | 核心源码解析（QueryMethods SQL 函数、高级特性等） |
+| [12-optional-field.md](references/12-optional-field.md) | OptionalField 三态值类型（部分更新场景） |
+| [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField 源码实现 |
+| [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil 事务工具类（简化编程式事务管理） |
 
 ## 📋 常用导入
 
 ```java
 import com.mybatisflex.core.query.QueryWrapper;
+import com.mybatisflex.core.query.If;
 import com.mybatisflex.core.query.QueryChain;
 import com.mybatisflex.core.update.UpdateChain;
 import com.mybatisflex.core.row.Db;
@@ -207,16 +229,21 @@ lobe skill install mybatis-flex-skill
 mybatis-flex-skill/
 ├── SKILL.md
 └── references/
-    ├── 01-annotations.md
-    ├── 02-querywrapper-advanced.md
-    ├── 02a-querychain.md
-    ├── 03-base-entities.md
-    ├── 04-service-mapper.md
-    ├── 05-type-handling.md
-    ├── 06-source-api.md
-    ├── 07-optional-field.md
-    ├── 07-1-optional-field-source.md
-    └── 08-transaction-util.md
+    ├── 00-index.md
+    ├── 01-apt-configuration.md
+    ├── 02-annotations.md
+    ├── 03-basic-features.md
+    ├── 04-querywrapper-advanced.md
+    ├── 05-querychain.md
+    ├── 06-updatechain.md
+    ├── 07-core-features.md
+    ├── 08-base-entities.md
+    ├── 09-service-mapper.md
+    ├── 10-type-handling.md
+    ├── 11-source-api.md
+    ├── 12-optional-field.md
+    ├── 12a-optional-field-source.md
+    └── 13-transaction-util.md
 ```
 
 ### APT 配置

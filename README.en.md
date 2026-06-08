@@ -77,7 +77,7 @@ processor.mapper.generateInclude=com.example.entity.*
 </dependency>
 ```
 
-> See `references/00-apt-configuration.md` for details.
+> See `references/01-apt-configuration.md` for details.
 
 ### Service Layer Best Practices
 
@@ -123,7 +123,7 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 }
 ```
 
-> See `references/07-optional-field.md` for details.
+> See `references/12-optional-field.md` for details.
 
 ## 📚 Reference Documentation
 
@@ -131,17 +131,21 @@ See the `references/` directory for details:
 
 | Document | Description |
 |----------|-------------|
-| [00-apt-configuration.md](references/00-apt-configuration.md) | APT code generation configuration (TableDef, Mapper auto-generation) |
-| [01-annotations.md](references/01-annotations.md) | Entity annotations (@Table, @Id, @Column, @Relation, etc.) |
-| [02-querywrapper-advanced.md](references/02-querywrapper-advanced.md) | QueryWrapper advanced usage (multi-table joins, subqueries, SQL functions, etc.) |
-| [02a-querychain.md](references/02a-querychain.md) | QueryChain chained queries (chain call wrapper, direct result returns) |
-| [03-base-entities.md](references/03-base-entities.md) | Base entity classes & configuration (BaseEntity, UUIDv7, auto-fill) |
-| [04-service-mapper.md](references/04-service-mapper.md) | Service and Mapper operation reference |
-| [05-type-handling.md](references/05-type-handling.md) | Data type handling (enums, JSON, dates, etc.) |
-| [06-source-api.md](references/06-source-api.md) | Core source code analysis (QueryMethods SQL functions, advanced features, etc.) |
-| [07-optional-field.md](references/07-optional-field.md) | OptionalField tri-state type (partial update scenarios) |
-| [07-1-optional-field-source.md](references/07-1-optional-field-source.md) | OptionalField source code implementation |
-| [08-transaction-util.md](references/08-transaction-util.md) | TransactionUtil transaction utility class (simplified programmatic transaction management) |
+| [00-index.md](references/00-index.md) | Official feature map and reference index |
+| [01-apt-configuration.md](references/01-apt-configuration.md) | APT code generation configuration (TableDef, Mapper auto-generation) |
+| [02-annotations.md](references/02-annotations.md) | Entity annotations (@Table, @Id, @Column, @Relation, etc.) |
+| [03-basic-features.md](references/03-basic-features.md) | Official basic feature examples |
+| [04-querywrapper-advanced.md](references/04-querywrapper-advanced.md) | QueryWrapper advanced usage (multi-table joins, subqueries, SQL functions, etc.) |
+| [05-querychain.md](references/05-querychain.md) | QueryChain chained queries (chain call wrapper, direct result returns) |
+| [06-updatechain.md](references/06-updatechain.md) | UpdateChain chained updates (conditional set, setRaw, partial update) |
+| [07-core-features.md](references/07-core-features.md) | Official core feature examples |
+| [08-base-entities.md](references/08-base-entities.md) | Base entity classes & configuration (BaseEntity, UUIDv7, auto-fill) |
+| [09-service-mapper.md](references/09-service-mapper.md) | Service and Mapper operation reference |
+| [10-type-handling.md](references/10-type-handling.md) | Data type handling (enums, JSON, dates, etc.) |
+| [11-source-api.md](references/11-source-api.md) | Core source code analysis (QueryMethods SQL functions, advanced features, etc.) |
+| [12-optional-field.md](references/12-optional-field.md) | OptionalField tri-state type (partial update scenarios) |
+| [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField source code implementation |
+| [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil transaction utility class (simplified programmatic transaction management) |
 
 ## 📋 Common Imports
 
@@ -239,16 +243,21 @@ After installation, the directory structure should look like this:
 mybatis-flex-skill/
 ├── SKILL.md
 └── references/
-    ├── 01-annotations.md
-    ├── 02-querywrapper-advanced.md
-    ├── 02a-querychain.md
-    ├── 03-base-entities.md
-    ├── 04-service-mapper.md
-    ├── 05-type-handling.md
-    ├── 06-source-api.md
-    ├── 07-optional-field.md
-    ├── 07-1-optional-field-source.md
-    └── 08-transaction-util.md
+    ├── 00-index.md
+    ├── 01-apt-configuration.md
+    ├── 02-annotations.md
+    ├── 03-basic-features.md
+    ├── 04-querywrapper-advanced.md
+    ├── 05-querychain.md
+    ├── 06-updatechain.md
+    ├── 07-core-features.md
+    ├── 08-base-entities.md
+    ├── 09-service-mapper.md
+    ├── 10-type-handling.md
+    ├── 11-source-api.md
+    ├── 12-optional-field.md
+    ├── 12a-optional-field-source.md
+    └── 13-transaction-util.md
 ```
 
 ### APT Configuration

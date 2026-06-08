@@ -233,6 +233,6 @@ public class MybatisFlexConfig {
 
 适用于需要编程式事务控制的场景。需要 `spring-tx` 的 `PlatformTransactionManager`。
 
-**源码位置**：见 `08-transaction-util.md`
+**源码位置**：见 `13-transaction-util.md`
 
-**使用示例**：见 `08-transaction-util.md`
+**使用示例**：见 `13-transaction-util.md`

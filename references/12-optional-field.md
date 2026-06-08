@@ -1,6 +1,6 @@
 # OptionalField 三态值类型
 
-> ⚠️ **前提条件**：使用 `OptionalField` 三态值类型前，必须先确保项目中已引入该类型。源码实现请参考 [07-1-optional-field-source.md](07-1-optional-field-source.md)。
+> ⚠️ **前提条件**：使用 `OptionalField` 三态值类型前，必须先确保项目中已引入该类型。源码实现请参考 [12a-optional-field-source.md](12a-optional-field-source.md)。
 
 > OptionalField 是一个自定义的三态值类型，用于处理部分更新场景。它表示字段的三种状态：有值、null、不存在。
 
