@@ -1,26 +1,25 @@
 ---
 name: mybatis-flex-skill
 description: >-
-  MyBatis-Flex 开发技能。当用户请求涉及 MyBatis-Flex 框架、MyBatis-Flex
-  代码生成、Mapper/Service 持久层、QueryWrapper、QueryChain、UpdateChain、
-  DbChain、UpdateEntity、部分字段更新、动态条件更新、字段判空后更新、
-  CRUD、基础查询、自动映射、关联查询、批量操作、Db + Row、Active Record、
-  IService、SpringBoot 配置、MyBatisFlexCustomizer、逻辑删除、乐观锁、
-  数据填充、数据脱敏、数据缓存、SQL 审计、SQL 打印、多数据源、读写分离、
-  数据源加密、动态表名、事务、数据权限、字段权限、字段加密、字典回写、
-  枚举属性、多租户、注解映射、APT 配置、版本迁移、最佳实践咨询、
-  代码检查、优化、重构、问题排查或代码解释时激活。
+  MyBatis-Flex 开发技能。仅当后端项目明确使用 MyBatis-Flex 依赖或语法时激活，
+  例如 com.mybatisflex 依赖、mybatis-flex.config、MyBatisFlexCustomizer、
+  TableDef、QueryChain、UpdateChain、DbChain、UpdateEntity、Db + Row、
+  MyBatis-Flex 注解、APT 代码生成、逻辑删除、乐观锁、多租户、数据权限等
+  MyBatis-Flex 能力。若项目使用 MyBatis-Plus、原生 MyBatis、JPA 或其他 ORM，
+  且没有 MyBatis-Flex 依赖或语法证据，不要激活本技能。
 ---
 
 # MyBatis-Flex 开发技能
 
 ## 工作方式
 
-1. 先识别任务主题，再只读取对应 reference；不要一次性加载全部文档。
-2. 优先复用项目既有 Mapper、Service、DTO、异常、事务和权限模式。
-3. 默认优先链式操作：查询用 `QueryChain` / `QueryWrapper`，更新用 `UpdateChain`，无实体或通用 SQL 再考虑 `Db + Row`。
-4. 涉及 API、DTO、SQL、数据库字段、权限、租户、事务、数据源、动态表名、审计、加密时，先梳理完整调用链和影响范围。
-5. 保持最小、安全、可回滚修改；未明确要求不新增依赖、不迁移数据、不改变公共契约。
+1. 先确认项目存在 MyBatis-Flex 证据：`com.mybatisflex` 依赖、`mybatis-flex.config`、`MyBatisFlexCustomizer`、`QueryChain`、`UpdateChain`、`DbChain`、`UpdateEntity`、`TableDef` 或 `com.mybatisflex.*` 导入。
+2. 如果只看到 `com.baomidou.mybatisplus`、MyBatis-Plus 的 `LambdaQueryWrapper` / `ServiceImpl`，或原生 MyBatis 的 `SqlSession` / XML Mapper，不使用本技能。
+3. 确认是 MyBatis-Flex 后，再识别任务主题，只读取对应 reference；不要一次性加载全部文档。
+4. 优先复用项目既有 Mapper、Service、DTO、异常、事务和权限模式。
+5. 默认优先链式操作：查询用 `QueryChain` / `QueryWrapper`，更新用 `UpdateChain`，无实体或通用 SQL 再考虑 `Db + Row`。
+6. 涉及 API、DTO、SQL、数据库字段、权限、租户、事务、数据源、动态表名、审计、加密时，先梳理完整调用链和影响范围。
+7. 保持最小、安全、可回滚修改；未明确要求不新增依赖、不迁移数据、不改变公共契约。
 
 ## 快速路由
 

@@ -6,7 +6,7 @@
 
 ## 📖 简介
 
-当您需要使用 MyBatis-Flex 框架编写 Java 持久层代码时，此技能将自动激活，包括：
+当后端项目明确使用 MyBatis-Flex 依赖或语法时，此技能将自动激活，包括：
 
 - 实体类定义
 - CRUD 操作
@@ -24,6 +24,8 @@
 - MyBatisFlexCustomizer
 - 逻辑删除、乐观锁、多租户、权限、审计等核心能力
 - 事务管理
+
+不会因普通 MyBatis、MyBatis-Plus、JPA 或其他 ORM 持久层任务触发；除非项目中能看到 `com.mybatisflex` 依赖、`mybatis-flex.config`、`QueryChain`、`UpdateChain`、`DbChain`、`UpdateEntity`、`TableDef` 或 `com.mybatisflex.*` 导入等 MyBatis-Flex 证据。
 
 ## 🚀 核心特性
 

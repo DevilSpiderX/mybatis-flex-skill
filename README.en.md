@@ -6,7 +6,7 @@ A LobeHub Skill that provides intelligent assistance for writing Java persistenc
 
 ## 📖 Introduction
 
-This skill activates automatically when you need to write Java persistence layer code using the MyBatis-Flex framework, including:
+This skill activates only when a backend project clearly uses MyBatis-Flex dependencies or syntax, including:
 
 - Entity class definitions
 - CRUD operations
@@ -14,6 +14,8 @@ This skill activates automatically when you need to write Java persistence layer
 - Association queries
 - Batch operations
 - Transaction management
+
+It should not activate for plain MyBatis, MyBatis-Plus, JPA, or other ORM persistence tasks unless there is MyBatis-Flex evidence such as `com.mybatisflex` dependencies, `mybatis-flex.config`, `QueryChain`, `UpdateChain`, `DbChain`, `UpdateEntity`, `TableDef`, or `com.mybatisflex.*` imports.
 
 ## 🚀 Core Features
 
