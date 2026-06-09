@@ -23,23 +23,86 @@ description: >-
 
 ## 快速路由
 
-| 任务主题 | 优先读取 |
-|----------|----------|
-| 官网功能地图、选 reference | `references/00-index.md` |
-| APT、TableDef、Mapper 生成 | `references/01-apt-configuration.md` |
-| `@Table`、`@Id`、`@Column`、Relations 注解 | `references/02-annotations.md` |
-| CRUD、基础查询、自动映射、关联、批量、Db + Row、Active Record、IService、配置 | `references/03-basic-features.md` |
-| QueryWrapper、多表、子查询、SQL 函数、动态条件 | `references/04-querywrapper-advanced.md` |
-| QueryChain 查询、分页、VO/DTO 映射查询 | `references/05-querychain.md` |
-| UpdateChain、条件 `set`、`setRaw`、部分更新 | `references/06-updatechain.md` |
-| 逻辑删除、乐观锁、填充、权限、多租户、动态表名、多数据源、审计 | `references/07-core-features.md` |
-| BaseEntity、UUIDv7、自动填充基础配置 | `references/08-base-entities.md` |
-| Service 与 Mapper 分层、常用 CRUD 封装 | `references/09-service-mapper.md` |
-| 枚举、JSON、日期等类型处理 | `references/10-type-handling.md` |
-| 源码级 API、完整方法列表 | `references/11-source-api.md` |
-| PATCH/部分更新三态值 | `references/12-optional-field.md` |
-| OptionalField 源码实现 | `references/12a-optional-field-source.md` |
-| 编程式事务工具 | `references/13-transaction-util.md` |
+按"遇到什么场景 → 看到什么代码信号 → 读哪个文件"匹配。如果任务涉及多个场景，按优先级依次读取对应文件。
+
+### 一、项目初始化 & 代码生成
+
+| 场景 | 代码信号 / 关键词 | 读取 |
+|------|-------------------|------|
+| 新建实体后缺少 TableDef 或 Mapper | 编译报错找不到 `AccountTableDef`，或 `mybatis-flex-processor` 相关配置 | `references/01-apt-configuration.md` |
+| 不确定某个功能用哪个 reference 文件 | 需要功能地图或官方文档入口 | `references/00-index.md` |
+| 项目还没有公共基类，需要统一 `id`/`createTime`/`updateTime` 等字段 | 无 `BaseEntity`，或需要 UUIDv7 主键、自动填充 `createUser`/`updateUser` | `references/08-base-entities.md` |
+
+### 二、实体定义 & 字段映射
+
+| 场景 | 代码信号 / 关键词 | 读取 |
+|------|-------------------|------|
+| 配置实体类注解：表名、主键策略、列映射、字段忽略、大字段 | `@Table`、`@Id`、`@Column`、`@ColumnAlias`、`KeyType`、`isLarge` | `references/02-annotations.md` |
+| 定义实体间关联关系（一对一、一对多、多对多） | `@RelationOneToOne`、`@RelationOneToMany`、`@RelationManyToOne`、`@RelationManyToMany` | `references/02-annotations.md` |
+| 字段类型映射问题：枚举存库、JSON 列、日期格式、脱敏、大字段、自定义 TypeHandler | `@Column(typeHandler=...)`、`@EnumValue`、`JacksonTypeHandler`、`Fastjson2TypeHandler`、`MaskTypeHandler`、`isLarge` | `references/10-type-handling.md` |
+
+### 三、查询
+
+| 场景 | 代码信号 / 关键词 | 读取 |
+|------|-------------------|------|
+| 需要链式查询：按 ID 查、列表、分页、查单个字段、DTO/VO 转换 | `QueryChain`、`.one()`、`.list()`、`.page()`、`.oneAs()`、`.listAs()`、`.pageAs()`、`.obj()`、`.count()`、`.exists()` | `references/05-querychain.md` |
+| 需要构建复杂 SQL：多表 JOIN、子查询、SQL 函数、CASE WHEN、GROUP BY/HAVING、UNION、CTE、EXISTS、FOR UPDATE | `QueryWrapper.create()`、`leftJoin`、`rightJoin`、`innerJoin`、`QueryMethods`（`count`/`max`/`sum`/`concat`/`year` 等）、`and(or)`、`with...asSelect`、`forUpdate()`、`distinct()`、`.when()`、`toSQL()` | `references/04-querywrapper-advanced.md` |
+| 需要关联查询（带 Relations 的查询） | `selectOneWithRelationsById`、`withRelations`、`oneWithRelations()`、`listWithRelationsAs()` | `references/05-querychain.md`（关联查询章节），如需 `@Relation` 注解写法则补读 `references/02-annotations.md` |
+| 不需要实体类，直接用 SQL 或 Row 操作 | `Db.selectOneById`、`Db.selectAllBySql`、`Db.selectListBySql`、`Row` | `references/09-service-mapper.md`（Db 工具类章节） |
+| 不确定 `QueryWrapper` 或 `QueryChain` 有哪些可用方法 | 需要方法列表、参数签名、类继承关系 | `references/11-source-api.md` |
+
+### 四、新增 & 批量
+
+| 场景 | 代码信号 / 关键词 | 读取 |
+|------|-------------------|------|
+| 基础新增：`insert` vs `insertSelective` 的区别与选择 | `insert`、`insertSelective`、null 字段是否入库 | `references/03-basic-features.md` |
+| 批量新增 | `insertBatch`、`insertBatchSelective`、`Db.executeBatch`、`Db.updateEntitiesBatch` | `references/03-basic-features.md`（批量章节），`references/09-service-mapper.md`（Db 批量章节） |
+| 新增或更新（存在则更新） | `insertOrUpdate` | `references/09-service-mapper.md` |
+
+### 五、更新 & 部分更新
+
+| 场景 | 代码信号 / 关键词 | 读取 |
+|------|-------------------|------|
+| 链式条件更新：有值才更新、动态 set、原子增减 | `UpdateChain`、`.set(field, value, If::hasText)`、`.set(field, value, If::notNull)`、`.setRaw()`（如 `age + 1`） | `references/06-updatechain.md` |
+| PATCH 语义：需要区分"字段未传"和"字段传了 null"三态 | `OptionalField<T>`、`State.MISSING`/`NULL`/`VALUE`、DTO 中用 `OptionalField` 包装字段 | 读 `references/12-optional-field.md`；需要理解源码实现或 `OptionalDtoUtil.toUpdateEntity()` 内部逻辑时补读 `references/12a-optional-field-source.md` |
+| 按 ID 更新实体部分字段（不用 UpdateChain） | `UpdateEntity.of(Account.class, id)`，然后 `mapper.updateByEntity()` | `references/09-service-mapper.md`（UpdateEntity 章节） |
+
+### 六、删除
+
+| 场景 | 代码信号 / 关键词 | 读取 |
+|------|-------------------|------|
+| 基础删除：按 ID、按条件 | `deleteById`、`deleteByQuery` | `references/03-basic-features.md` |
+| 逻辑删除（软删除，不物理删除） | `@Column(isLogicDelete = true)`、`LogicDeleteProcessor` | `references/07-core-features.md` |
+
+### 七、Service & Mapper 分层
+
+| 场景 | 代码信号 / 关键词 | 读取 |
+|------|-------------------|------|
+| 不确定 Service 层怎么写：是否继承 IService、怎么注入 Mapper | `Service` 类、`BaseMapper`、`mapper.queryChain()` | `references/09-service-mapper.md` |
+| 需要查看 `BaseMapper` 的完整方法列表 | `selectOneById`、`selectAll`、`selectListByQuery`、`selectListByQueryAs`、`paginate`、`selectCount`、`exists` | `references/09-service-mapper.md` |
+| 需要分页查询：Page 对象、`paginate` 用法、`PageWithDetails` | `paginate`、`Page`、`PageWithDetails` | `references/09-service-mapper.md` |
+| 只查询部分字段、字段排除、字段重命名 | `ALL_COLUMNS.except(...)`、`.as()`、`selectListByQueryAs` | `references/09-service-mapper.md` |
+
+### 八、框架核心功能
+
+| 场景 | 代码信号 / 关键词 | 读取 |
+|------|-------------------|------|
+| 乐观锁（版本号控制） | `@Column(version = true)`、`@Version` | `references/07-core-features.md` |
+| 多租户隔离 | `@Column(tenantId = true)`、`TenantManager`、`tenant_id` 字段 | `references/07-core-features.md` |
+| 数据权限（行级权限过滤） | `DataPermission`、行级过滤 | `references/07-core-features.md` |
+| 字段加密/脱敏 | `SetListener`、`@Table(onSet)`、字段加解密 | `references/07-core-features.md` |
+| 数据填充：自动写入 createTime/updateTime/createUser 等 | `@OnInsert`、`@OnUpdate`、`@Table(onInsert/onUpdate)`、`@Column(onInsertValue/onUpdateValue)` | `references/07-core-features.md`（填充章节），如需项目级统一配置则补读 `references/08-base-entities.md` |
+| 多数据源、读写分离、动态切换数据源 | `DataSourceKey`、`@DS`、数据源 YAML 配置 | `references/07-core-features.md` |
+| 动态表名（运行时切换表名，如按月分表） | `TableManager.setDynamicTableProcessor` | `references/07-core-features.md` |
+| SQL 审计、SQL 打印 | SQL 日志、审计拦截器 | `references/07-core-features.md` |
+| 编程式事务（不用 `@Transactional` 注解） | `TransactionUtil.execute()`、`TransactionUtil.getTemplate()`、`Propagation.REQUIRES_NEW` | `references/13-transaction-util.md` |
+
+### 九、Spring Boot 配置
+
+| 场景 | 代码信号 / 关键词 | 读取 |
+|------|-------------------|------|
+| `application.yml` 中 MyBatis-Flex 数据源、mapper-locations 配置 | YAML 配置、`MybatisFlexCustomizer` | `references/03-basic-features.md`（配置章节） |
+| APT 编译配置：Maven/Gradle 的 `annotationProcessorPaths` | `mybatis-flex-processor`、`pom.xml` / `build.gradle` 配置 | `references/01-apt-configuration.md` |
 
 ## 高优先级规则
 
