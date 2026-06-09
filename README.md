@@ -110,7 +110,7 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 }
 ```
 
-> 详细信息请查阅 `references/12-optional-field.md`
+> 详细信息请查阅 [12-optional-field.md](references/12-optional-field.md)
 
 ## 📚 参考文档
 
@@ -129,7 +129,11 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 | [08-base-entities.md](references/08-base-entities.md) | 基础实体类与配置（BaseEntity、UUIDv7、自动填充） |
 | [09-service-mapper.md](references/09-service-mapper.md) | Service 与 Mapper 操作参考 |
 | [10-type-handling.md](references/10-type-handling.md) | 数据类型处理（枚举、JSON、日期等） |
-| [11-source-api.md](references/11-source-api.md) | 核心源码解析（QueryMethods SQL 函数、高级特性等） |
+| [11-source-api.md](references/11-source-api.md) | 核心源码解析索引（类继承关系、子文件导航） |
+| [11a-source-api.md](references/11a-source-api.md) | QueryMethods SQL 函数（数学/字符串/日期/聚合/CASE WHEN 等） |
+| [11b-source-api.md](references/11b-source-api.md) | QueryWrapper / QueryWrapperAdapter / 链式查询源码解析 |
+| [11c-source-api.md](references/11c-source-api.md) | PropertySetter / UpdateWrapper / UpdateChain 源码解析 |
+| [11d-source-api.md](references/11d-source-api.md) | If 条件判断工具类 |
 | [12-optional-field.md](references/12-optional-field.md) | OptionalField 三态值类型（部分更新场景） |
 | [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField 源码实现 |
 | [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil 事务工具类（简化编程式事务管理） |
@@ -243,6 +247,10 @@ mybatis-flex-skill/
     ├── 09-service-mapper.md
     ├── 10-type-handling.md
     ├── 11-source-api.md
+    ├── 11a-source-api.md
+    ├── 11b-source-api.md
+    ├── 11c-source-api.md
+    ├── 11d-source-api.md
     ├── 12-optional-field.md
     ├── 12a-optional-field-source.md
     └── 13-transaction-util.md

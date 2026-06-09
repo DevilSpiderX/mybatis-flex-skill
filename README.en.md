@@ -125,7 +125,7 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 }
 ```
 
-> See `references/12-optional-field.md` for details.
+> See [12-optional-field.md](references/12-optional-field.md) for details.
 
 ## 📚 Reference Documentation
 
@@ -144,7 +144,11 @@ See the `references/` directory for details:
 | [08-base-entities.md](references/08-base-entities.md) | Base entity classes & configuration (BaseEntity, UUIDv7, auto-fill) |
 | [09-service-mapper.md](references/09-service-mapper.md) | Service and Mapper operation reference |
 | [10-type-handling.md](references/10-type-handling.md) | Data type handling (enums, JSON, dates, etc.) |
-| [11-source-api.md](references/11-source-api.md) | Core source code analysis (QueryMethods SQL functions, advanced features, etc.) |
+| [11-source-api.md](references/11-source-api.md) | Core source code analysis index (class hierarchy, sub-file navigation) |
+| [11a-source-api.md](references/11a-source-api.md) | QueryMethods SQL functions (math/string/date/aggregate/CASE WHEN, etc.) |
+| [11b-source-api.md](references/11b-source-api.md) | QueryWrapper / QueryWrapperAdapter / chained query source analysis |
+| [11c-source-api.md](references/11c-source-api.md) | PropertySetter / UpdateWrapper / UpdateChain source analysis |
+| [11d-source-api.md](references/11d-source-api.md) | If conditional utility class |
 | [12-optional-field.md](references/12-optional-field.md) | OptionalField tri-state type (partial update scenarios) |
 | [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField source code implementation |
 | [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil transaction utility class (simplified programmatic transaction management) |
@@ -257,6 +261,10 @@ mybatis-flex-skill/
     ├── 09-service-mapper.md
     ├── 10-type-handling.md
     ├── 11-source-api.md
+    ├── 11a-source-api.md
+    ├── 11b-source-api.md
+    ├── 11c-source-api.md
+    ├── 11d-source-api.md
     ├── 12-optional-field.md
     ├── 12a-optional-field-source.md
     └── 13-transaction-util.md

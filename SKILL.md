@@ -127,7 +127,7 @@ UpdateChain.of(Account.class)
 ```
 
 - `If::hasText` 表示字符串有非空白文本才生效；`If::notNull` 适合对象、数字、日期，以及空字符串是合法值的字段；`If::notEmpty`
-  适合集合、数组、Map；`If::noText` 是“为空时才生效”，不是“有值才更新”。
+  适合集合、数组、Map；`If::noText` 是“为空时才生效”，不是“有值才更新”。参考来源见 [11d-source-api.md](references/11d-source-api.md)。
 - 需要显式更新为 `null` 时，不要用普通 null 判空跳过；使用 `UpdateEntity` 或 `OptionalField` 区分“未传字段”和“传了 null”。
 - `setRaw` 只用于数据库表达式、原子增减、函数或受控子查询；禁止拼接未校验用户输入。
 
