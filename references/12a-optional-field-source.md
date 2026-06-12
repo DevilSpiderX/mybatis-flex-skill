@@ -2,7 +2,10 @@
 
 本文档包含 `OptionalField` 三态值类型的核心实现代码。
 
-## OptionalField 类
+> **架构说明**：`OptionalField` 采用 **sealed class 层次结构**，将三态行为分布到三个 final 子类中，
+> 避免运行时 switch/enum 分支判断，每个子类直接实现对应状态的语义。
+
+## OptionalField 类（基类）
 
 ```java
 package com.example.json.lang;
@@ -11,7 +14,6 @@ import jakarta.annotation.Nonnull;
 import jakarta.annotation.Nullable;
 
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
@@ -30,17 +32,17 @@ import java.util.stream.Stream;
  * <table>
  *   <tr><th>状态</th><th>含义</th><th>典型场景</th></tr>
  *   <tr>
- *     <td>{@link State#VALUE}</td>
+ *     <td>{@link ValueField}</td>
  *     <td>字段存在且有有效值</td>
  *     <td>{@code {"age": 25}}</td>
  *   </tr>
  *   <tr>
- *     <td>{@link State#NULL}</td>
+ *     <td>{@link NullField}</td>
  *     <td>字段存在但值为 {@code null}</td>
  *     <td>{@code {"age": null}}</td>
  *   </tr>
  *   <tr>
- *     <td>{@link State#MISSING}</td>
+ *     <td>{@link MissingField}</td>
  *     <td>字段不存在</td>
  *     <td>{@code {}}（无 age 字段）</td>
  *   </tr>
@@ -80,75 +82,38 @@ import java.util.stream.Stream;
  *
  * @param <T> 字段值的类型
  * @author DevilSpiderX
- * @since 1.0
- * @see State
+ * @see MissingField
+ * @see NullField
+ * @see ValueField
  * @see java.util.Optional
+ * @since 1.0
  */
-public class OptionalField<T> {
+public sealed abstract class OptionalField<T> permits MissingField, NullField, ValueField {
 
-    /** MISSING 状态的单例，表示字段不存在。 */
-    private static final OptionalField<?> MISSING = new OptionalField<>(State.MISSING, null);
-    /** NULL 状态的单例，表示字段存在但值为 {@code null}。 */
-    private static final OptionalField<?> NULL = new OptionalField<>(State.NULL, null);
-
-    /**
-     * 表示 JSON 字段的存在状态。
-     *
-     * @see #MISSING 字段不存在
-     * @see #NULL    字段存在但值为 null
-     * @see #VALUE   字段存在且有有效值
-     */
-    public enum State {
-        /** 字段在 JSON 中不存在。 */
-        MISSING,
-        /** 字段在 JSON 中存在但值为 {@code null}。 */
-        NULL,
-        /** 字段在 JSON 中存在且有有效值。 */
-        VALUE
-    }
-
-    private final State state;
-    private final T value;
-
-    /**
-     * 构造 {@link OptionalField} 实例。
-     *
-     * @param state 字段状态，不能为 {@code null}
-     * @param value 字段值，当状态为 {@link State#VALUE} 时不应为 {@code null}
-     */
-    private OptionalField(final @Nonnull State state, final @Nullable T value) {
-        this.state = state;
-        this.value = value;
-    }
+    // region 静态工厂方法
 
     /**
      * 创建一个表示字段不存在（MISSING 状态）的 {@link OptionalField} 实例。
-     * <p>
-     * MISSING 状态表示 JSON 中该字段完全不存在，区别于字段存在但值为 null（{@link #_null()}）。
-     * </p>
      *
      * @param <T> 值的类型
      * @return MISSING 状态的 {@link OptionalField} 实例
      */
     @Nonnull
+    @SuppressWarnings("unchecked")
     public static <T> OptionalField<T> missing() {
-        // noinspection unchecked
-        return (OptionalField<T>) MISSING;
+        return (OptionalField<T>) MissingField.INSTANCE;
     }
 
     /**
      * 创建一个表示字段值为 {@code null}（NULL 状态）的 {@link OptionalField} 实例。
-     * <p>
-     * NULL 状态表示 JSON 中该字段存在但显式设置为 {@code null}，区别于字段不存在（{@link #missing()}）。
-     * </p>
      *
      * @param <T> 值的类型
      * @return NULL 状态的 {@link OptionalField} 实例
      */
     @Nonnull
+    @SuppressWarnings("unchecked")
     public static <T> OptionalField<T> _null() {
-        // noinspection unchecked
-        return (OptionalField<T>) NULL;
+        return (OptionalField<T>) NullField.INSTANCE;
     }
 
     /**
@@ -167,7 +132,7 @@ public class OptionalField<T> {
         if (value == null) {
             return _null();
         } else {
-            return new OptionalField<>(State.VALUE, value);
+            return new ValueField<>(value);
         }
     }
 
@@ -177,9 +142,6 @@ public class OptionalField<T> {
      *   <li>如果 {@code field} 为 {@code null}，返回 {@link #missing()}（MISSING 状态）</li>
      *   <li>如果 {@code field} 非 {@code null}，直接返回该字段</li>
      * </ul>
-     * <p>
-     * 此方法通常用于将可能为 {@code null} 的 {@link OptionalField} 转换为安全的非 null 实例。
-     * </p>
      *
      * @param <T>   值的类型
      * @param field 要包装的 {@link OptionalField}，可以为 {@code null}
@@ -193,200 +155,106 @@ public class OptionalField<T> {
         return field;
     }
 
+    // endregion
+
+    // region 状态查询
+
     /**
-     * 获取当前字段的状态。
+     * 判断字段是否存在有效值（VALUE 状态）。
      *
-     * @return 字段的状态，不会为 {@code null}
-     * @see State
+     * @return 如果字段状态为 VALUE，返回 {@code true}；否则返回 {@code false}
      */
-    public State getState() {
-        return state;
+    public abstract boolean isPresent();
+
+    /**
+     * 判断字段的值是否为 {@code null}（NULL 状态）。
+     *
+     * @return 如果字段状态为 NULL，返回 {@code true}；否则返回 {@code false}
+     */
+    public abstract boolean isNull();
+
+    /**
+     * 判断字段是否不存在（MISSING 状态）。
+     *
+     * @return 如果字段状态为 MISSING，返回 {@code true}；否则返回 {@code false}
+     */
+    public abstract boolean isMissing();
+
+    /**
+     * 判断当前字段是否为空（即不存在或显式为 null）。
+     *
+     * @return 如果字段状态为 NULL 或 MISSING，返回 {@code true}；
+     * 否则返回 {@code false}
+     */
+    public boolean isEmpty() {
+        return isNull() || isMissing();
     }
+
+    // endregion
+
+    // region 获取值
 
     /**
      * 获取字段的值。
      * <p>
-     * 注意：如果状态为 {@link State#MISSING} 或 {@link State#NULL}，返回 {@code null}。
+     * 注意：如果状态为 NULL 或 MISSING，返回 {@code null}。
      * 建议使用 {@link #orElse(Object)} 或 {@link #orElseThrow()} 等方法安全地获取值。
      * </p>
      *
      * @return 字段的值，可能为 {@code null}
      */
-    public T getValue() {
-        return value;
-    }
-
-    /**
-     * 判断字段是否存在有效值（VALUE 状态）。
-     *
-     * @return 如果字段状态为 {@link State#VALUE}，返回 {@code true}；否则返回 {@code false}
-     */
-    public boolean isPresent() {
-        return state == State.VALUE;
-    }
-
-    /**
-     * 判断字段的值是否为 {@code null}（NULL 状态）。
-     * <p>
-     * NULL 状态表示 JSON 中该字段存在但显式设置为 {@code null}。
-     * </p>
-     *
-     * @return 如果字段状态为 {@link State#NULL}，返回 {@code true}；否则返回 {@code false}
-     */
-    public boolean isNull() {
-        return state == State.NULL;
-    }
-
-    /**
-     * 判断字段是否不存在（MISSING 状态）。
-     * <p>
-     * MISSING 状态表示 JSON 中该字段完全不存在。
-     * </p>
-     *
-     * @return 如果字段状态为 {@link State#MISSING}，返回 {@code true}；否则返回 {@code false}
-     */
-    public boolean isMissing() {
-        return state == State.MISSING;
-    }
-
-    /**
-     * 判断当前字段是否为空（即不存在或显式为 null）。
-     * <p>
-     * 语义上等价于 {@code !isPresent()}，但提供了更具可读性的表达方式。
-     * </p>
-     *
-     * @return 如果字段状态为 {@link State#MISSING} 或 {@link State#NULL}，返回 {@code true}；
-     * 否则返回 {@code false}
-     */
-    public boolean isEmpty() {
-        return !isPresent();
-    }
-
-    @Override
-    public String toString() {
-        return switch (state) {
-            case MISSING -> "OptionalField.MISSING";
-            case NULL -> "OptionalField.NULL";
-            case VALUE -> "OptionalField[" + value + "]";
-        };
-    }
-
-    @Override
-    public boolean equals(final Object o) {
-        if (!(o instanceof final OptionalField<?> that)) return false;
-        return state == that.state && Objects.equals(value, that.value);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(state, value);
-    }
+    public abstract T getValue();
 
     /**
      * 将字段的值转换为 {@link Stream}。
-     * <p>
-     * 如果字段状态为 {@link State#VALUE} 且值不为 {@code null}，返回包含该值的单元素流；否则返回空流。
-     * </p>
      *
      * @return 包含字段值的 {@link Stream}，不会为 {@code null}
      */
     @Nonnull
-    public Stream<T> stream() {
-        if (isPresent()) {
-            return Stream.of(value);
-        } else {
-            return Stream.empty();
-        }
-    }
+    public abstract Stream<T> stream();
 
     /**
      * 获取字段的值，如果值不存在则返回指定的默认值。
-     * <p>
-     * 无论字段状态为 {@link State#MISSING} 还是 {@link State#NULL}，都返回 {@code other}。
-     * </p>
      *
      * @param other 值不存在时的默认值，可以为 {@code null}
      * @return 字段的值（如果存在）；否则返回 {@code other}
      */
-    public T orElse(final @Nullable T other) {
-        return orElse(other, other);
-    }
+    public abstract T orElse(final @Nullable T other);
 
     /**
      * 获取字段的值，根据不同的无值状态分别返回不同的默认值。
-     * <p>
-     * 与 {@link #orElse(Object)} 不同的是，此方法允许区分 NULL 和 MISSING 两种状态，分别提供不同的默认值。
-     * </p>
      *
      * @param otherInNull    字段值为 {@code null}（NULL 状态）时的默认值
      * @param otherInMissing 字段不存在（MISSING 状态）时的默认值
      * @return 根据字段状态返回对应的值
      */
-    public T orElse(final T otherInNull, final T otherInMissing) {
-        return switch (state) {
-            case VALUE -> value;
-            case NULL -> otherInNull;
-            case MISSING -> otherInMissing;
-        };
-    }
+    public abstract T orElse(final @Nullable T otherInNull, final @Nullable T otherInMissing);
 
     /**
      * 如果字段存在有效值，则返回该值；否则抛出 {@link NoSuchElementException}。
-     * <p>
-     * 与 {@link java.util.Optional#get()} 语义一致，适用于确定值存在的场景。
-     * </p>
      *
      * @return 有效值
      * @throws NoSuchElementException 如果字段不存在有效值
      */
     @Nonnull
-    public T orElseThrow() {
-        if (isPresent()) {
-            assert value != null;
-            return value;
-        }
-        throw new NoSuchElementException("No value present");
-    }
+    public abstract T orElseThrow();
 
     /**
      * 如果字段存在有效值，则返回该值；否则抛出异常。
-     * <p>
-     * 适用于业务上确定值必须存在的场景，避免手动编写 if-throw 模式。
-     * </p>
-     * <p>
-     * 典型使用场景：
-     * <pre>{@code
-     * // 业务上确定 name 字段一定存在
-     * String name = record.getOptionalName()
-     *         .orElseThrow(() -> new IllegalStateException("name 字段缺失"));
-     * }</pre>
-     * </p>
      *
      * @return 有效值
      * @throws X 如果字段不存在有效值
      */
     @Nonnull
-    public <X extends Throwable> T orElseThrow(final @Nonnull Supplier<? extends X> exceptionSupplier) throws X {
-        if (isPresent()) {
-            assert value != null;
-            return value;
-        }
-        throw exceptionSupplier.get();
-    }
+    public abstract <X extends Throwable> T orElseThrow(final @Nonnull Supplier<? extends X> exceptionSupplier) throws X;
 
     /**
      * 获取字段的值，如果值不存在则通过 {@link Supplier} 延迟计算默认值。
-     * <p>
-     * 与 {@link #orElse(Object)} 类似，但默认值是延迟计算的，适用于默认值创建成本较高的场景。
-     * </p>
      *
-     * @param supplier 值不存在时用于生成默认值的供应者，不能为 {@code null}
+     * @param supplier 值不存在时用于生成默认值的供应者
      * @return 字段的值（如果存在）；否则返回 {@code supplier} 提供的值
-     * @throws NullPointerException 如果 {@code supplier} 为 {@code null}
      */
-    public T orElseGet(final @Nonnull Supplier<? extends T> supplier) {
-        return orElseGet(supplier, supplier);
-    }
+    public abstract T orElseGet(final @Nonnull Supplier<? extends T> supplier);
 
     /**
      * 获取字段的值，根据不同的无值状态分别通过 {@link Supplier} 延迟计算默认值。
@@ -394,130 +262,58 @@ public class OptionalField<T> {
      * @param supplierInNull    字段值为 {@code null}（NULL 状态）时的默认值供应者
      * @param supplierInMissing 字段不存在（MISSING 状态）时的默认值供应者
      * @return 根据字段状态返回对应的值
-     * @throws NullPointerException 如果任一供应者为 {@code null}
      */
-    public T orElseGet(
+    public abstract T orElseGet(
             final @Nonnull Supplier<? extends T> supplierInNull,
             final @Nonnull Supplier<? extends T> supplierInMissing
-    ) {
-        return switch (state) {
-            case VALUE -> value;
-            case NULL -> supplierInNull.get();
-            case MISSING -> supplierInMissing.get();
-        };
-    }
+    );
+
+    // endregion
+
+    // region 条件执行
 
     /**
      * 如果字段存在有效值，则执行给定的操作。
-     * <p>
-     * 与 {@code if (field.isPresent()) consumer.accept(field.get())} 等价，
-     * 但更简洁且表达意图更清晰。
-     * </p>
-     * <p>
-     * 典型使用场景：
-     * <pre>{@code
-     * record.getOptionalName().ifPresent(name -> log.info("Name: {}", name));
-     * }</pre>
-     * </p>
      *
-     * @param action 要执行的操作，不能为 {@code null}
-     * @throws NullPointerException 如果 {@code action} 为 {@code null}
+     * @param action 要执行的操作
      */
-    public void ifPresent(final @Nonnull Consumer<? super T> action) {
-        Objects.requireNonNull(action);
-        if (isPresent()) {
-            action.accept(value);
-        }
-    }
+    public abstract void ifPresent(final @Nonnull Consumer<? super T> action);
 
     /**
      * 如果字段值为 {@code null}（NULL 状态），则执行给定的操作。
-     * <p>
-     * 典型使用场景：
-     * <pre>{@code
-     * record.getOptionalName()
-     *         .ifNull(() -> log.warn("Name is explicitly null"));
-     * }</pre>
-     * </p>
      *
-     * @param action 值为 null 时要执行的操作，不能为 {@code null}
-     * @throws NullPointerException 如果 {@code action} 为 {@code null}
-     * @since 1.0
+     * @param action 值为 null 时要执行的操作
      */
-    public void ifNull(final @Nonnull Runnable action) {
-        Objects.requireNonNull(action);
-        if (isNull()) {
-            action.run();
-        }
-    }
+    public abstract void ifNull(final @Nonnull Runnable action);
 
     /**
      * 如果字段不存在（MISSING 状态），则执行给定的操作。
-     * <p>
-     * 典型使用场景：
-     * <pre>{@code
-     * record.getOptionalName()
-     *         .ifMissing(() -> log.warn("Name field not present in JSON"));
-     * }</pre>
-     * </p>
      *
-     * @param action 字段不存在时要执行的操作，不能为 {@code null}
-     * @throws NullPointerException 如果 {@code action} 为 {@code null}
-     * @since 1.0
+     * @param action 字段不存在时要执行的操作
      */
-    public void ifMissing(final @Nonnull Runnable action) {
-        Objects.requireNonNull(action);
-        if (isMissing()) {
-            action.run();
-        }
-    }
+    public abstract void ifMissing(final @Nonnull Runnable action);
 
     /**
      * 如果字段"为空"（NULL 或 MISSING 状态），则执行给定的操作。
-     * <p>
-     * 此方法将 NULL 和 MISSING 视为统一的"空"状态，适用于需要统一处理无值场景的情况。
-     * </p>
-     * <p>
-     * 典型使用场景：
-     * <pre>{@code
-     * record.getOptionalName()
-     *         .ifEmpty(() -> log.warn("Name is not available (null or missing)"));
-     * }</pre>
-     * </p>
      *
-     * @param action 字段为空时要执行的操作，不能为 {@code null}
-     * @throws NullPointerException 如果 {@code action} 为 {@code null}
-     * @since 1.0
+     * @param action 字段为空时要执行的操作
      */
-    public void ifEmpty(final @Nonnull Runnable action) {
-        Objects.requireNonNull(action);
-        if (isEmpty()) {
-            action.run();
-        }
-    }
+    public abstract void ifEmpty(final @Nonnull Runnable action);
+
+    // endregion
+
+    // region 模式匹配
 
     /**
      * 根据字段状态执行对应的分支操作（双分支，忽略 MISSING 状态）。
-     * <p>
-     * 如果字段处于 VALUE 状态，执行 {@code present}；如果处于 NULL 状态，执行 {@code nullValue}。
-     * MISSING 状态不执行任何操作。
-     * </p>
      *
      * @param present   字段有值时的操作
      * @param nullValue 字段值为 null 时的操作
-     * @throws NullPointerException 如果任一参数为 {@code null}
      */
-    public void match(
+    public abstract void match(
             final @Nonnull Consumer<? super T> present,
             final @Nonnull Runnable nullValue
-    ) {
-        Objects.requireNonNull(present);
-        Objects.requireNonNull(nullValue);
-        switch (state) {
-            case NULL -> nullValue.run();
-            case VALUE -> present.accept(value);
-        }
-    }
+    );
 
     /**
      * 根据字段状态执行对应的分支操作（三分支）。
@@ -525,22 +321,12 @@ public class OptionalField<T> {
      * @param present   字段有值时的操作
      * @param nullValue 字段值为 null 时的操作
      * @param missing   字段不存在时的操作
-     * @throws NullPointerException 如果任一参数为 {@code null}
      */
-    public void match(
+    public abstract void match(
             final @Nonnull Consumer<? super T> present,
             final @Nonnull Runnable nullValue,
             final @Nonnull Runnable missing
-    ) {
-        Objects.requireNonNull(present);
-        Objects.requireNonNull(nullValue);
-        Objects.requireNonNull(missing);
-        switch (state) {
-            case MISSING -> missing.run();
-            case NULL -> nullValue.run();
-            case VALUE -> present.accept(value);
-        }
-    }
+    );
 
     /**
      * 根据字段状态执行对应的映射函数并返回结果（三分支，带返回值）。
@@ -550,22 +336,16 @@ public class OptionalField<T> {
      * @param nullValue 字段值为 null 时的值供应者
      * @param missing   字段不存在时的值供应者
      * @return 根据字段状态返回对应的映射结果
-     * @throws NullPointerException 如果任一参数为 {@code null}
      */
-    public <R> R match(
+    public abstract <R> R match(
             final @Nonnull Function<? super T, ? extends R> present,
             final @Nonnull Supplier<? extends R> nullValue,
             final @Nonnull Supplier<? extends R> missing
-    ) {
-        Objects.requireNonNull(present);
-        Objects.requireNonNull(nullValue);
-        Objects.requireNonNull(missing);
-        return switch (state) {
-            case MISSING -> missing.get();
-            case NULL -> nullValue.get();
-            case VALUE -> present.apply(value);
-        };
-    }
+    );
+
+    // endregion
+
+    // region 链式转换
 
     /**
      * 如果字段存在有效值，则对其应用映射函数并返回新的 {@link OptionalField}。
@@ -574,43 +354,21 @@ public class OptionalField<T> {
      * </p>
      *
      * @param <U>    映射后的值类型
-     * @param mapper 映射函数，不能为 {@code null}
+     * @param mapper 映射函数
      * @return 映射后的新 {@link OptionalField} 实例
-     * @throws NullPointerException 如果 {@code mapper} 为 {@code null}
      */
     @Nonnull
-    public <U> OptionalField<U> map(final @Nonnull Function<? super T, ? extends U> mapper) {
-        Objects.requireNonNull(mapper);
-        if (isPresent()) {
-            return OptionalField.of(mapper.apply(value));
-        }
-        // noinspection unchecked
-        return (OptionalField<U>) this;
-    }
+    public abstract <U> OptionalField<U> map(final @Nonnull Function<? super T, ? extends U> mapper);
 
     /**
      * 如果字段存在有效值，则对其应用返回 {@link OptionalField} 的映射函数（展平嵌套）。
-     * <p>
-     * 与 {@link #map(Function)} 不同的是，此方法的映射函数本身返回 {@link OptionalField}，
-     * 避免产生 {@code OptionalField<OptionalField<T>>} 的嵌套结构。
-     * </p>
      *
      * @param <U>    映射后的值类型
-     * @param mapper 映射函数，返回 {@link OptionalField}，不能为 {@code null}
+     * @param mapper 映射函数，返回 {@link OptionalField}
      * @return 映射后的 {@link OptionalField} 实例
-     * @throws NullPointerException 如果 {@code mapper} 或其返回值为 {@code null}
      */
     @Nonnull
-    public <U> OptionalField<U> flatMap(final @Nonnull Function<? super T, ? extends OptionalField<? extends U>> mapper) {
-        Objects.requireNonNull(mapper);
-        if (isPresent()) {
-            // noinspection unchecked
-            final OptionalField<U> r = (OptionalField<U>) mapper.apply(value);
-            return Objects.requireNonNull(r);
-        }
-        // noinspection unchecked
-        return (OptionalField<U>) this;
-    }
+    public abstract <U> OptionalField<U> flatMap(final @Nonnull Function<? super T, ? extends OptionalField<? extends U>> mapper);
 
     /**
      * 如果字段存在有效值且满足给定谓词，则返回当前字段；否则返回 {@link #_null()}。
@@ -622,29 +380,683 @@ public class OptionalField<T> {
      *   <li>字段不存在 → 返回 {@code this}（保持 MISSING 状态）</li>
      * </ul>
      * </p>
-     * <p>
-     * 典型使用场景：
-     * <pre>{@code
-     * // 获取有效邮箱，过滤掉无效格式
-     * OptionalField<String> validEmail = record.getOptionalEmail()
-     *         .filter(email -> email.contains("@"));
-     * // 如果 email 存在但格式不对，validEmail 状态为 NULL（而非 MISSING）
-     * // 如果 email 字段本身不存在，validEmail 状态仍为 MISSING
-     * }</pre>
-     * </p>
      *
-     * @param predicate 谓词条件，不能为 {@code null}
+     * @param predicate 谓词条件
      * @return 值存在且满足谓词返回当前字段；值存在但不满足返回 {@link #_null()}；值不存在返回 {@link #missing()}
-     * @throws NullPointerException 如果 {@code predicate} 为 {@code null}
      */
+    @Nonnull
+    public abstract OptionalField<T> filter(final @Nonnull Predicate<? super T> predicate);
+
+    // endregion
+
+}
+```
+
+## ValueField 类（VALUE 状态）
+
+```java
+package com.example.json.lang;
+
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
+
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
+
+/**
+ * 表示 JSON 字段存在且有有效值（VALUE 状态）的 {@link OptionalField} 子类。
+ *
+ * <p>VALUE 状态表示 JSON 中该字段存在且包含一个非 {@code null} 的值。</p>
+ *
+ * @param <T> 字段值的类型
+ * @author DevilSpiderX
+ * @see MissingField
+ * @see NullField
+ * @since 1.0
+ */
+public final class ValueField<T> extends OptionalField<T> {
+
+    /**
+     * 字段的值，保证非 {@code null}。
+     */
+    private final T value;
+
+    /**
+     * 构造包含指定值的 {@link ValueField} 实例。
+     *
+     * @param value 字段的值，不能为 {@code null}
+     * @throws NullPointerException 如果 {@code value} 为 {@code null}
+     */
+    ValueField(final @Nonnull T value) {
+        super();
+        this.value = Objects.requireNonNull(value, "value must not be null");
+    }
+
+    // region 状态查询
+
+    @Override
+    public boolean isPresent() {
+        return true;
+    }
+
+    @Override
+    public boolean isNull() {
+        return false;
+    }
+
+    @Override
+    public boolean isMissing() {
+        return false;
+    }
+
+    // endregion
+
+    // region 获取值
+
+    @Override
+    @Nonnull
+    public T getValue() {
+        return value;
+    }
+
+    @Override
+    @Nonnull
+    public Stream<T> stream() {
+        return Stream.of(value);
+    }
+
+    @Override
+    public T orElse(final T other) {
+        return value;
+    }
+
+    @Override
+    public T orElse(final @Nullable T otherInNull, final @Nullable T otherInMissing) {
+        return value;
+    }
+
+    @Override
+    @Nonnull
+    public T orElseThrow() {
+        return value;
+    }
+
+    @Override
+    @Nonnull
+    public <X extends Throwable> T orElseThrow(final @Nonnull Supplier<? extends X> exceptionSupplier) {
+        return value;
+    }
+
+    @Override
+    public T orElseGet(final @Nonnull Supplier<? extends T> supplier) {
+        return value;
+    }
+
+    @Override
+    public T orElseGet(
+            final @Nonnull Supplier<? extends T> supplierInNull,
+            final @Nonnull Supplier<? extends T> supplierInMissing
+    ) {
+        return value;
+    }
+
+    // endregion
+
+    // region 条件执行
+
+    @Override
+    public void ifPresent(final @Nonnull Consumer<? super T> action) {
+        Objects.requireNonNull(action);
+        action.accept(value);
+    }
+
+    @Override
+    public void ifNull(final @Nonnull Runnable action) {
+        Objects.requireNonNull(action);
+        // no-op: 不是 NULL 状态
+    }
+
+    @Override
+    public void ifMissing(final @Nonnull Runnable action) {
+        Objects.requireNonNull(action);
+        // no-op: 不是 MISSING 状态
+    }
+
+    @Override
+    public void ifEmpty(final @Nonnull Runnable action) {
+        Objects.requireNonNull(action);
+        // no-op: VALUE 状态不是"空"
+    }
+
+    // endregion
+
+    // region 模式匹配
+
+    @Override
+    public void match(
+            final @Nonnull Consumer<? super T> present,
+            final @Nonnull Runnable nullValue
+    ) {
+        Objects.requireNonNull(present);
+        Objects.requireNonNull(nullValue);
+        present.accept(value);
+    }
+
+    @Override
+    public void match(
+            final @Nonnull Consumer<? super T> present,
+            final @Nonnull Runnable nullValue,
+            final @Nonnull Runnable missing
+    ) {
+        Objects.requireNonNull(present);
+        Objects.requireNonNull(nullValue);
+        Objects.requireNonNull(missing);
+        present.accept(value);
+    }
+
+    @Override
+    public <R> R match(
+            final @Nonnull Function<? super T, ? extends R> present,
+            final @Nonnull Supplier<? extends R> nullValue,
+            final @Nonnull Supplier<? extends R> missing
+    ) {
+        Objects.requireNonNull(present);
+        Objects.requireNonNull(nullValue);
+        Objects.requireNonNull(missing);
+        return present.apply(value);
+    }
+
+    // endregion
+
+    // region 链式转换
+
+    @Override
+    @Nonnull
+    public <U> OptionalField<U> map(final @Nonnull Function<? super T, ? extends U> mapper) {
+        Objects.requireNonNull(mapper);
+        return OptionalField.of(mapper.apply(value));
+    }
+
+    @Override
+    @Nonnull
+    @SuppressWarnings("unchecked")
+    public <U> OptionalField<U> flatMap(final @Nonnull Function<? super T, ? extends OptionalField<? extends U>> mapper) {
+        Objects.requireNonNull(mapper);
+        final OptionalField<U> result = (OptionalField<U>) mapper.apply(value);
+        return Objects.requireNonNull(result);
+    }
+
+    @Override
     @Nonnull
     public OptionalField<T> filter(final @Nonnull Predicate<? super T> predicate) {
         Objects.requireNonNull(predicate);
-        if (isPresent()) {
-            return predicate.test(value) ? this : _null();
-        }
-        return this; // MISSING 状态保持不变
+        return predicate.test(value) ? this : OptionalField._null();
     }
+
+    // endregion
+
+    // region Object 方法
+
+    @Override
+    @Nonnull
+    public String toString() {
+        return "OptionalField[" + value + "]";
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        if (o instanceof ValueField<?> that) {
+            return Objects.equals(value, that.value);
+        }
+        return false;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash("OptionalField.VALUE", value);
+    }
+
+    // endregion
+
+}
+```
+
+## NullField 类（NULL 状态）
+
+```java
+package com.example.json.lang;
+
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
+
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
+
+/**
+ * 表示 JSON 字段存在但值为 {@code null}（NULL 状态）的 {@link OptionalField} 子类。
+ *
+ * <p>NULL 状态表示 JSON 中该字段存在但显式设置为 {@code null}，区别于字段不存在（{@link MissingField}）。</p>
+ *
+ * @author DevilSpiderX
+ * @see MissingField
+ * @see ValueField
+ * @since 1.0
+ */
+public final class NullField extends OptionalField<Object> {
+
+    static final NullField INSTANCE = new NullField();
+
+    private NullField() {
+        super();
+    }
+
+    // region 状态查询
+
+    @Override
+    public boolean isPresent() {
+        return false;
+    }
+
+    @Override
+    public boolean isNull() {
+        return true;
+    }
+
+    @Override
+    public boolean isMissing() {
+        return false;
+    }
+
+    // endregion
+
+    // region 获取值
+
+    @Override
+    @Nullable
+    public Object getValue() {
+        return null;
+    }
+
+    @Override
+    @Nonnull
+    public Stream<Object> stream() {
+        return Stream.empty();
+    }
+
+    @Override
+    public Object orElse(final @Nullable Object other) {
+        return other;
+    }
+
+    @Override
+    public Object orElse(final @Nullable Object otherInNull, final @Nullable Object otherInMissing) {
+        return otherInNull;
+    }
+
+    @Override
+    @Nonnull
+    public Object orElseThrow() {
+        throw new NoSuchElementException("No value present");
+    }
+
+    @Override
+    @Nonnull
+    public <X extends Throwable> Object orElseThrow(final @Nonnull Supplier<? extends X> exceptionSupplier) throws X {
+        throw exceptionSupplier.get();
+    }
+
+    @Override
+    public Object orElseGet(final @Nonnull Supplier<?> supplier) {
+        return supplier.get();
+    }
+
+    @Override
+    public Object orElseGet(
+            final @Nonnull Supplier<?> supplierInNull,
+            final @Nonnull Supplier<?> supplierInMissing
+    ) {
+        return supplierInNull.get();
+    }
+
+    // endregion
+
+    // region 条件执行
+
+    @Override
+    public void ifPresent(final @Nonnull Consumer<? super Object> action) {
+        Objects.requireNonNull(action);
+        // no-op: 值不存在
+    }
+
+    @Override
+    public void ifNull(final @Nonnull Runnable action) {
+        Objects.requireNonNull(action);
+        action.run();
+    }
+
+    @Override
+    public void ifMissing(final @Nonnull Runnable action) {
+        Objects.requireNonNull(action);
+    }
+
+    @Override
+    public void ifEmpty(final @Nonnull Runnable action) {
+        ifNull(action);
+    }
+
+    // endregion
+
+    // region 模式匹配
+
+    @Override
+    public void match(
+            final @Nonnull Consumer<? super Object> present,
+            final @Nonnull Runnable nullValue
+    ) {
+        Objects.requireNonNull(present);
+        Objects.requireNonNull(nullValue);
+        nullValue.run();
+    }
+
+    @Override
+    public void match(
+            final @Nonnull Consumer<? super Object> present,
+            final @Nonnull Runnable nullValue,
+            final @Nonnull Runnable missing
+    ) {
+        Objects.requireNonNull(present);
+        Objects.requireNonNull(nullValue);
+        Objects.requireNonNull(missing);
+        nullValue.run();
+    }
+
+    @Override
+    public <R> R match(
+            final @Nonnull Function<? super Object, ? extends R> present,
+            final @Nonnull Supplier<? extends R> nullValue,
+            final @Nonnull Supplier<? extends R> missing
+    ) {
+        Objects.requireNonNull(present);
+        Objects.requireNonNull(nullValue);
+        Objects.requireNonNull(missing);
+        return nullValue.get();
+    }
+
+    // endregion
+
+    // region 链式转换
+
+    @Override
+    @Nonnull
+    @SuppressWarnings("unchecked")
+    public <U> OptionalField<U> map(final @Nonnull Function<? super Object, ? extends U> mapper) {
+        Objects.requireNonNull(mapper);
+        return (OptionalField<U>) this;
+    }
+
+    @Override
+    @Nonnull
+    @SuppressWarnings("unchecked")
+    public <U> OptionalField<U> flatMap(final @Nonnull Function<? super Object, ? extends OptionalField<? extends U>> mapper) {
+        Objects.requireNonNull(mapper);
+        return (OptionalField<U>) this;
+    }
+
+    @Override
+    @Nonnull
+    public OptionalField<Object> filter(final @Nonnull Predicate<? super Object> predicate) {
+        Objects.requireNonNull(predicate);
+        return this;
+    }
+
+    // endregion
+
+    // region Object 方法
+
+    @Override
+    @Nonnull
+    public String toString() {
+        return "OptionalField.NULL";
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        return o instanceof NullField;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash("OptionalField.NULL");
+    }
+
+    // endregion
+
+}
+```
+
+## MissingField 类（MISSING 状态）
+
+```java
+package com.example.json.lang;
+
+import jakarta.annotation.Nonnull;
+import jakarta.annotation.Nullable;
+
+import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.function.Consumer;
+import java.util.function.Function;
+import java.util.function.Predicate;
+import java.util.function.Supplier;
+import java.util.stream.Stream;
+
+/**
+ * 表示 JSON 字段不存在（MISSING 状态）的 {@link OptionalField} 子类。
+ *
+ * <p>MISSING 状态表示 JSON 中该字段完全不存在，区别于字段存在但值为 null（{@link NullField}）。</p>
+ *
+ * @author DevilSpiderX
+ * @see NullField
+ * @see ValueField
+ * @since 1.0
+ */
+public final class MissingField extends OptionalField<Object> {
+
+    static final MissingField INSTANCE = new MissingField();
+
+    private MissingField() {
+        super();
+    }
+
+    // region 状态查询
+
+    @Override
+    public boolean isPresent() {
+        return false;
+    }
+
+    @Override
+    public boolean isNull() {
+        return false;
+    }
+
+    @Override
+    public boolean isMissing() {
+        return true;
+    }
+
+    // endregion
+
+    // region 获取值
+
+    @Override
+    @Nullable
+    public Object getValue() {
+        return null;
+    }
+
+    @Override
+    @Nonnull
+    public Stream<Object> stream() {
+        return Stream.empty();
+    }
+
+    @Override
+    public Object orElse(final @Nullable Object other) {
+        return other;
+    }
+
+    @Override
+    public Object orElse(final @Nullable Object otherInNull, final @Nullable Object otherInMissing) {
+        return otherInMissing;
+    }
+
+    @Override
+    @Nonnull
+    public Object orElseThrow() {
+        throw new NoSuchElementException("No value present");
+    }
+
+    @Override
+    @Nonnull
+    public <X extends Throwable> Object orElseThrow(final @Nonnull Supplier<? extends X> exceptionSupplier) throws X {
+        throw exceptionSupplier.get();
+    }
+
+    @Override
+    public Object orElseGet(final @Nonnull Supplier<?> supplier) {
+        return supplier.get();
+    }
+
+    @Override
+    public Object orElseGet(
+            final @Nonnull Supplier<?> supplierInNull,
+            final @Nonnull Supplier<?> supplierInMissing
+    ) {
+        return supplierInMissing.get();
+    }
+
+    // endregion
+
+    // region 条件执行
+
+    @Override
+    public void ifPresent(final @Nonnull Consumer<? super Object> action) {
+        Objects.requireNonNull(action);
+        // no-op: 字段不存在
+    }
+
+    @Override
+    public void ifNull(final @Nonnull Runnable action) {
+        Objects.requireNonNull(action);
+    }
+
+    @Override
+    public void ifMissing(final @Nonnull Runnable action) {
+        Objects.requireNonNull(action);
+        action.run();
+    }
+
+    @Override
+    public void ifEmpty(final @Nonnull Runnable action) {
+        ifMissing(action);
+    }
+
+    // endregion
+
+    // region 模式匹配
+
+    @Override
+    public void match(
+            final @Nonnull Consumer<? super Object> present,
+            final @Nonnull Runnable nullValue
+    ) {
+        Objects.requireNonNull(present);
+        Objects.requireNonNull(nullValue);
+        // no-op: MISSING 状态在双分支匹配中被忽略
+    }
+
+    @Override
+    public void match(
+            final @Nonnull Consumer<? super Object> present,
+            final @Nonnull Runnable nullValue,
+            final @Nonnull Runnable missing
+    ) {
+        Objects.requireNonNull(present);
+        Objects.requireNonNull(nullValue);
+        Objects.requireNonNull(missing);
+        missing.run();
+    }
+
+    @Override
+    public <R> R match(
+            final @Nonnull Function<? super Object, ? extends R> present,
+            final @Nonnull Supplier<? extends R> nullValue,
+            final @Nonnull Supplier<? extends R> missing
+    ) {
+        Objects.requireNonNull(present);
+        Objects.requireNonNull(nullValue);
+        Objects.requireNonNull(missing);
+        return missing.get();
+    }
+
+    // endregion
+
+    // region 链式转换
+
+    @Override
+    @Nonnull
+    @SuppressWarnings("unchecked")
+    public <U> OptionalField<U> map(final @Nonnull Function<? super Object, ? extends U> mapper) {
+        Objects.requireNonNull(mapper);
+        return (OptionalField<U>) this;
+    }
+
+    @Override
+    @Nonnull
+    @SuppressWarnings("unchecked")
+    public <U> OptionalField<U> flatMap(final @Nonnull Function<? super Object, ? extends OptionalField<? extends U>> mapper) {
+        Objects.requireNonNull(mapper);
+        return (OptionalField<U>) this;
+    }
+
+    @Override
+    @Nonnull
+    public OptionalField<Object> filter(final @Nonnull Predicate<? super Object> predicate) {
+        Objects.requireNonNull(predicate);
+        return this;
+    }
+
+    // endregion
+
+    // region Object 方法
+
+    @Override
+    @Nonnull
+    public String toString() {
+        return "OptionalField.MISSING";
+    }
+
+    @Override
+    public boolean equals(final Object o) {
+        return o instanceof MissingField;
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash("OptionalField.MISSING");
+    }
+
+    // endregion
 
 }
 ```
