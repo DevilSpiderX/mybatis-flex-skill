@@ -186,7 +186,7 @@ import static com.example.common.entity.table.AccountTableDef.ACCOUNT;
 
 // 类型安全查询
 QueryWrapper.create()
-    .select(ACCOUNT.ALL_COLUMNS)
+    .select(ACCOUNT.DEFAULT_COLUMNS)
     .from(ACCOUNT)
     .where(ACCOUNT.ID.ge(100));
 ```

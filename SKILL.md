@@ -21,7 +21,7 @@ description: >-
 4. 优先复用项目既有 Mapper、Service、DTO、异常、事务和权限模式。
 5. 默认优先链式操作：查询用 `QueryChain` / `QueryWrapper`，更新用 `UpdateChain`，无实体或通用 SQL 再考虑 `Db + Row`。
 6. 涉及 API、DTO、SQL、数据库字段、权限、租户、事务、数据源、动态表名、审计、加密时，先梳理完整调用链和影响范围。
-7. 保持最小、安全、可回滚修改；未明确要求不新增依赖、不迁移数据、不改变公共契约。111
+7. 保持最小、安全、可回滚修改；未明确要求不新增依赖、不迁移数据、不改变公共契约。
 
 ## 快速路由
 
@@ -31,7 +31,7 @@ description: >-
 
 | 场景                                                | 代码信号 / 关键词                                                  | 读取                                   |
 |---------------------------------------------------|-------------------------------------------------------------|--------------------------------------|
-| 新建实体后缺少 TableDef 或 Mapper                         | 编译报错找不到 `AccountTableDef`，或 `mybatis-flex-processor` 相关配置   | `references/01-apt-configuration.md` |
+| 新建实体后缺少 TableDef 或 Mapper                         | 编译报错找不到 `AccountTableDef`，或 `mybatis-flex-processor` / `mybatis-flex.config` 相关配置 | `references/01-apt-configuration.md` |
 | 不确定某个功能用哪个 reference 文件                           | 需要功能地图或官方文档入口                                               | `references/00-index.md`             |
 | 项目还没有公共基类，需要统一 `id`/`createTime`/`updateTime` 等字段 | 无 `BaseEntity`，或需要 UUIDv7 主键、自动填充 `createUser`/`updateUser` | `references/08-base-entities.md`     |
 
@@ -114,6 +114,9 @@ description: >-
 ## 高优先级规则
 
 - APT 生成的 `TableDef` 是类型安全查询首选；列引用优先 `ACCOUNT.AGE`，条件判断可用 `If::hasText` 等方法引用。
+- `mybatis-flex-processor` 的 Maven/Gradle 坐标使用 `com.mybatis-flex:mybatis-flex-processor`；不要把 Java 包名 `com.mybatisflex.*` 误写成 Maven groupId。
+- APT 配置项按官方 `processor.tableDef.*`、`processor.mapper.*` 写法；不要编造 `processor.entity.*` 或 `processor.mapper.generateInclude` / `processor.mapper.generateExclude`。
+- APT 生成目录默认在 `target/generated-sources/annotations`；不要提交或手写生成文件，先修 annotation processor 与 `mybatis-flex.config`。
 - `ServiceImpl` 默认不要继承 `IService`；除非既有项目已经统一使用 IService 风格，否则 Service 直接注入 Mapper。
 - `UpdateChain.set` / `setRaw` 的第三个条件参数支持 `boolean`、`BooleanSupplier`、`Predicate<V>`。
 - “有值才更新”优先：

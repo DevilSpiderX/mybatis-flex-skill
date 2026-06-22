@@ -18,6 +18,7 @@
 | IService | `03-basic-features.md`、`09-service-mapper.md` | 本项目默认 Service 直接注入 Mapper，除非既有代码已采用 IService |
 | SpringBoot 配置文件 | `03-basic-features.md` | 数据源、MyBatis-Flex 配置、SQL 打印等 |
 | MyBatisFlexCustomizer | `03-basic-features.md`、`07-core-features.md` | 全局配置、主键生成、多租户、动态表名、审计、打印 |
+| APT 设置 | `01-apt-configuration.md` | TableDef、Mapper 自动生成、`mybatis-flex.config`、`annotationProcessorPaths` |
 
 ## 核心功能
 
@@ -57,3 +58,6 @@
 - Db + Row：https://mybatis-flex.com/zh/base/db-row.html
 - Active Record：https://mybatis-flex.com/zh/base/active-record.html
 - MyBatisFlexCustomizer：https://mybatis-flex.com/zh/base/mybatis-flex-customizer.html
+- APT 设置：https://mybatis-flex.com/zh/others/apt.html
+- Maven 依赖：https://mybatis-flex.com/zh/intro/maven.html
+- Gradle 依赖：https://mybatis-flex.com/zh/intro/gradle.html
