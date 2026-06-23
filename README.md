@@ -66,6 +66,8 @@ public class Account extends BaseEntity {
 
 APT 自动生成 TableDef 类，用于类型安全查询。
 
+> APT 处理器坐标使用 `com.mybatis-flex:mybatis-flex-processor`，并优先配置到 Maven `annotationProcessorPaths` 或 Gradle `annotationProcessor`，不要提交生成目录。
+
 ### Service 层最佳实践
 
 > ⚠️ **重要限制**：ServiceImpl **不能**继承 IService，直接注入 Mapper 使用。
@@ -263,6 +265,7 @@ mybatis-flex-skill/
 processor.enable=true
 processor.mapper.generateEnable=true
 processor.mapper.annotation=true
+processor.tableDef.package=${entityPackage}.table
 ```
 
 ## 📝 功能速查

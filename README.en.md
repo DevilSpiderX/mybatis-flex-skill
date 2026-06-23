@@ -58,6 +58,7 @@ MyBatis-Flex uses APT to automatically generate `TableDef` classes and `Mapper` 
 **Configuration (`mybatis-flex.config` in project root):**
 ```properties
 # mybatis-flex.config
+processor.enable=true
 
 # Enable Mapper interface auto-generation
 processor.mapper.generateEnable=true
@@ -65,18 +66,17 @@ processor.mapper.generateEnable=true
 # Add @Mapper annotation to generated Mapper
 processor.mapper.annotation=true
 
-# Specify entity class package path
-processor.mapper.generateInclude=com.example.entity.*
+# Optional TableDef package
+processor.tableDef.package=${entityPackage}.table
 ```
 
-**Maven dependency:**
+**Maven annotation processor:**
 ```xml
-<dependency>
-    <groupId>com.mybatisflex</groupId>
+<path>
+    <groupId>com.mybatis-flex</groupId>
     <artifactId>mybatis-flex-processor</artifactId>
     <version>${mybatis-flex.version}</version>
-    <scope>provided</scope>
-</dependency>
+</path>
 ```
 
 > See `references/01-apt-configuration.md` for details.
@@ -277,6 +277,7 @@ mybatis-flex-skill/
 processor.enable=true
 processor.mapper.generateEnable=true
 processor.mapper.annotation=true
+processor.tableDef.package=${entityPackage}.table
 ```
 
 ## 📝 Feature Cheat Sheet
