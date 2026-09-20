@@ -27,16 +27,18 @@ DIST_ROOT = REPO_ROOT / "dist"
 
 PACKAGES: dict[str, list[str]] = {
     # package: (复制规则) —— 元组为 (目标子路径, 源路径) 列表
+    # 两个宿主包内部布局保持一致：skills/<name>/ + hooks/hooks.json
+    # 仅 manifest 目录（.claude-plugin/ vs .codex-plugin/）与 hooks 内容不同。
     "claude-plugin": [
         (".claude-plugin/plugin.json", ".claude-plugin/plugin.json"),
         ("hooks/hooks.json", "hooks/hooks.json"),
         ("hooks/session_activation.py", "hooks/session_activation.py"),
-        ("SKILL.md", "SKILL.md"),
-        ("references", "references"),
+        ("skills/mybatis-flex-skill/SKILL.md", "SKILL.md"),
+        ("skills/mybatis-flex-skill/references", "references"),
     ],
     "codex-plugin": [
         (".codex-plugin/plugin.json", ".codex-plugin/plugin.json"),
-        ("hooks/hooks.codex.json", "hooks/hooks.codex.json"),
+        ("hooks/hooks.json", "hooks/hooks.codex.json"),
         ("hooks/session_activation.py", "hooks/session_activation.py"),
         ("skills/mybatis-flex-skill/SKILL.md", "SKILL.md"),
         ("skills/mybatis-flex-skill/references", "references"),
@@ -48,10 +50,14 @@ PACKAGES: dict[str, list[str]] = {
 }
 
 MANIFEST_KEYS = {
-    "claude-plugin": [".claude-plugin/plugin.json", "hooks/hooks.json", "SKILL.md"],
+    "claude-plugin": [
+        ".claude-plugin/plugin.json",
+        "hooks/hooks.json",
+        "skills/mybatis-flex-skill/SKILL.md",
+    ],
     "codex-plugin": [
         ".codex-plugin/plugin.json",
-        "hooks/hooks.codex.json",
+        "hooks/hooks.json",
         "skills/mybatis-flex-skill/SKILL.md",
     ],
     "portable-skill": ["SKILL.md"],

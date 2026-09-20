@@ -212,7 +212,7 @@ cp -r . /path/to/your-project/.agents/skills/mybatis-flex-skill
 cp -r . ~/.agents/skills/mybatis-flex-skill
 ```
 
-**插件形态（带 hooks）**：使用构建产物 `dist/codex-plugin/`（含 `.codex-plugin/plugin.json` 与 `hooks/hooks.codex.json`），按 Codex 插件安装方式加载；hooks 逻辑与 Claude 端一致。
+**插件形态（带 hooks）**：使用构建产物 `dist/codex-plugin/`（含 `.codex-plugin/plugin.json` 与 `hooks/hooks.json`），按 Codex 插件安装方式加载；hooks 逻辑与 Claude 端一致。
 
 #### OpenCode
 
@@ -249,8 +249,8 @@ mybatis-flex-skill/
 ├── SKILL.md
 ├── .claude-plugin/plugin.json      # Claude 插件清单（可选，随目录安装即生效）
 ├── hooks/
-│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit hook
-│   ├── hooks.codex.json            # Codex hook 配置
+│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit/PreCompact/PostCompact/PostToolUse hook
+│   ├── hooks.codex.json            # Codex hook 配置（构建后进入 dist/codex-plugin/hooks/hooks.json）
 │   └── session_activation.py       # 有界证据检测 + 激活上下文注入
 ├── .codex-plugin/plugin.json       # Codex 插件清单（可选）
 ├── scripts/build.py                # 多宿主分发包构建脚本

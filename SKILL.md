@@ -18,10 +18,12 @@ description: >-
   会话启动或提交 prompt 时有界检测当前项目是否存在 MyBatis-Flex 证据（`com.mybatisflex` 依赖、
   `mybatis-flex.config`、`com.mybatisflex` 导入、`application.yml` 中的 `mybatis-flex:` 配置），
   命中时注入一段简短激活上下文；未命中时零输出，不消耗 token。
+- `PreCompact` / `PostCompact` / `PostToolUse`（Claude 另含 `PostToolUseFailure`）事件与
+  codex-noise-filter 参考实现的事件集保持一致，但这些事件不注入激活上下文（零输出）。
 - 若收到上述 hook 注入的激活上下文，说明项目确为 MyBatis-Flex 项目，直接按下方"工作方式"执行。
 - 本仓库可直接用于：Claude Code（`.claude/skills` 或插件）、Codex（`.codex-plugin` 或 `.agents/skills`）、
   OpenCode（`.opencode/skills`）、LobeHub 等支持 Agent Skills 的宿主；构建脚本 `scripts/build.py` 生成
-  `dist/` 下的多宿主分发包。
+  `dist/` 下的多宿主分发包（Claude 与 Codex 包内部布局一致，仅 manifest 目录与 hooks 宿主变量不同）。
 
 ## 工作方式
 

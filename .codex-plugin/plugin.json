@@ -18,7 +18,7 @@
     "tabledef"
   ],
   "skills": "./skills/",
-  "hooks": "./hooks/hooks.codex.json",
+  "hooks": "./hooks/hooks.json",
   "interface": {
     "displayName": "MyBatis-Flex Skill",
     "shortDescription": "MyBatis-Flex 后端开发技能",

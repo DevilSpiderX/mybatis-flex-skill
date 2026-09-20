@@ -14,7 +14,47 @@
         ]
       }
     ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/session_activation.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\hooks\\session_activation.py\"",
+            "timeout": 5,
+            "statusMessage": "标记压缩连续性恢复"
+          }
+        ]
+      }
+    ],
+    "PostCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/session_activation.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\hooks\\session_activation.py\"",
+            "timeout": 5,
+            "statusMessage": "标记压缩后恢复状态"
+          }
+        ]
+      }
+    ],
     "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/session_activation.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\hooks\\session_activation.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
       {
         "hooks": [
           {

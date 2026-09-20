@@ -224,7 +224,7 @@ cp -r . /path/to/your-project/.agents/skills/mybatis-flex-skill
 cp -r . ~/.agents/skills/mybatis-flex-skill
 ```
 
-**Plugin form (with hooks)**: use the build output `dist/codex-plugin/` (with `.codex-plugin/plugin.json` and `hooks/hooks.codex.json`), following the Codex plugin installation flow; hook logic is identical to the Claude side.
+**Plugin form (with hooks)**: use the build output `dist/codex-plugin/` (with `.codex-plugin/plugin.json` and `hooks/hooks.json`), following the Codex plugin installation flow; hook logic is identical to the Claude side.
 
 #### OpenCode
 
@@ -261,8 +261,8 @@ mybatis-flex-skill/
 ├── SKILL.md
 ├── .claude-plugin/plugin.json      # Claude plugin manifest (optional, active when the dir is installed)
 ├── hooks/
-│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit hook
-│   ├── hooks.codex.json            # Codex hook config
+│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit/PreCompact/PostCompact/PostToolUse hook
+│   ├── hooks.codex.json            # Codex hook config (built to dist/codex-plugin/hooks/hooks.json)
 │   └── session_activation.py       # Bounded evidence detection + activation context injection
 ├── .codex-plugin/plugin.json       # Codex plugin manifest (optional)
 ├── scripts/build.py                # Multi-host package build script
