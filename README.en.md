@@ -181,13 +181,15 @@ import com.mybatisflex.core.query.QueryMethods;
 
 ### Installation
 
-This skill follows the [Agent Skills Open Standard](https://agentskills.io/) and supports multiple AI coding tools.
+This skill follows the [Agent Skills Open Standard](https://agentskills.io/) and supports multiple AI coding tools. It also ships as a **plugin** for Claude Code / Codex with a `SessionStart` hook that actively detects the project and injects an activation context at session start, for reliable triggering.
 
 > **💡 Quick Install**: Copy the entire project directory (including `SKILL.md` and `references/`) to the corresponding tool's skills directory.
 >
 > ⚠️ **Note**: The `references/` directory contains core reference documents and **must** be installed together with `SKILL.md`, otherwise the skill will not work properly.
+>
+> 📦 **Multi-host packages**: Run `python3 scripts/build.py` to generate `dist/` containing the Claude plugin, Codex plugin, and portable skill packages.
 
-#### Claude Code
+#### Claude Code (CLI + Desktop)
 
 ```bash
 # Project level (recommended, version-controlled with project)
@@ -203,6 +205,15 @@ Alternatively, import in your project root's `CLAUDE.md`:
 @.claude/skills/mybatis-flex-skill/SKILL.md
 ```
 
+**Plugin form (recommended, with SessionStart hook)**: copy the whole repo directory into `~/.claude/skills/mybatis-flex-skill/` (or project `.claude/skills/mybatis-flex-skill/`). Since it contains `.claude-plugin/plugin.json`, Claude Code loads it as the `mybatis-flex-skill@skills-dir` plugin and enables `hooks/hooks.json` automatically:
+
+- `SessionStart` / `UserPromptSubmit` hooks **boundedly detect** whether the current project uses MyBatis-Flex;
+- on a hit, a short activation context is injected so the model routes to `references/` per `SKILL.md`;
+- on a miss, **zero output** — no tokens consumed (performance optimization);
+- injected once per session (deduplicated); re-detected and refreshed after `resume`/`clear`/`compact`.
+
+> Project-level `.claude/skills/` plugins require accepting the workspace trust dialog; user-level `~/.claude/skills/` has no such restriction.
+
 #### Codex (OpenAI)
 
 ```bash
@@ -213,7 +224,7 @@ cp -r . /path/to/your-project/.agents/skills/mybatis-flex-skill
 cp -r . ~/.agents/skills/mybatis-flex-skill
 ```
 
-You can also use the built-in `$skill-installer` in the Codex CLI (if the skill has been published to the community).
+**Plugin form (with hooks)**: use the build output `dist/codex-plugin/` (with `.codex-plugin/plugin.json` and `hooks/hooks.codex.json`), following the Codex plugin installation flow; hook logic is identical to the Claude side.
 
 #### OpenCode
 
@@ -248,6 +259,13 @@ After installation, the directory structure should look like this:
 ```
 mybatis-flex-skill/
 ├── SKILL.md
+├── .claude-plugin/plugin.json      # Claude plugin manifest (optional, active when the dir is installed)
+├── hooks/
+│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit hook
+│   ├── hooks.codex.json            # Codex hook config
+│   └── session_activation.py       # Bounded evidence detection + activation context injection
+├── .codex-plugin/plugin.json       # Codex plugin manifest (optional)
+├── scripts/build.py                # Multi-host package build script
 └── references/
     ├── 00-index.md
     ├── 01-apt-configuration.md
@@ -279,6 +297,23 @@ processor.mapper.generateEnable=true
 processor.mapper.annotation=true
 processor.tableDef.package=${entityPackage}.table
 ```
+
+## 🚀 Trigger Mechanism & Performance
+
+In plugin form (Claude Code / Codex), the `SessionStart` / `UserPromptSubmit` hooks are driven by the bundled
+`hooks/session_activation.py`, designed for "low noise, fast return, consistent across surfaces":
+
+| Goal | Implementation |
+|------|----------------|
+| Reliable triggering | `SessionStart` covers all session starts: `startup`/`resume`/`clear`/`compact`/`fork`; behavior is identical across CLI, desktop app, IDE extensions, and SSH remote sessions (officially, hook events fire the same wherever Claude Code runs) |
+| Zero noise | Injects the activation context only when MyBatis-Flex evidence is found (`com.mybatisflex` dependency, `mybatis-flex.config`, `com.mybatisflex` imports, `mybatis-flex:` in `application.yml`); zero output and zero token cost on a miss |
+| Fast return | Bounded detection: reads only the first 256 KiB of candidate build files, scans at most 256 source files at up to 8 levels deep; typically <10ms, hook timeout 5s |
+| Dedup | Injected once per session; re-detected and refreshed after `resume`/`clear`/`compact` so restored sessions keep the context |
+| Stateless fallback | Runs statelessly when `CLAUDE_PLUGIN_DATA` / `PLUGIN_DATA` is missing; state files capped at 64 and auto-pruned |
+
+> The official guidance is to put static context in `CLAUDE.md` rather than SessionStart. This skill puts the
+> dynamic part (evidence detection + activation reminder) in the hook, while static routing and reference docs
+> stay in `SKILL.md` / `references/` (loaded on demand, not all at once).
 
 ## 📝 Feature Cheat Sheet
 

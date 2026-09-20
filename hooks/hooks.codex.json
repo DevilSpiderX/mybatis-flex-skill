@@ -1,0 +1,30 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/session_activation.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\hooks\\session_activation.py\"",
+            "timeout": 5,
+            "statusMessage": "检测 MyBatis-Flex 项目并注入技能激活上下文"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$PLUGIN_ROOT/hooks/session_activation.py\"",
+            "commandWindows": "py -3 \"%PLUGIN_ROOT%\\hooks\\session_activation.py\"",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

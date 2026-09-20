@@ -169,13 +169,15 @@ import com.mybatisflex.core.query.QueryMethods;
 
 ### 安装方式
 
-本技能遵循 [Agent Skills 开放标准](https://agentskills.io/)，支持多种 AI 编程工具。
+本技能遵循 [Agent Skills 开放标准](https://agentskills.io/)，支持多种 AI 编程工具；同时也提供 Claude Code / Codex 的**插件形态**（自带 `SessionStart` hook，在会话启动时主动检测并注入激活上下文，提升触发稳定性）。
 
 > **💡 快速安装**：将整个项目目录（包含 `SKILL.md` 和 `references/`）复制到对应工具的 skills 目录下。
 >
 > ⚠️ **注意**：`references/` 目录包含核心参考文档，必须随 `SKILL.md` 一起安装，否则技能无法正常工作。
+>
+> 📦 **多宿主分发包**：运行 `python3 scripts/build.py` 可生成 `dist/` 下的 Claude 插件包、Codex 插件包和 portable skill 包。
 
-#### Claude Code
+#### Claude Code（终端 + 桌面端）
 
 ```bash
 # 项目级别（推荐，随项目版本控制）
@@ -191,6 +193,15 @@ cp -r . ~/.claude/skills/mybatis-flex-skill
 @.claude/skills/mybatis-flex-skill/SKILL.md
 ```
 
+**插件形态（推荐，带 SessionStart hook）**：将本仓库整个目录放入 `~/.claude/skills/mybatis-flex-skill/`（或项目 `.claude/skills/mybatis-flex-skill/`），目录内含 `.claude-plugin/plugin.json`，Claude Code 会将其作为 `mybatis-flex-skill@skills-dir` 插件加载，自动启用 `hooks/hooks.json`：
+
+- `SessionStart` / `UserPromptSubmit` hook 会**有界检测**当前项目是否使用 MyBatis-Flex；
+- 命中时注入一段简短激活上下文，提醒模型按 `SKILL.md` 快速路由读取 references；
+- 未命中时**零输出**，不消耗 token（性能优化）；
+- 同一会话只注入一次（去重），`resume`/`clear`/`compact` 后重新检测刷新。
+
+> 项目级 `.claude/skills/` 下的插件需要接受 workspace trust 对话框；用户级 `~/.claude/skills/` 无此限制。
+
 #### Codex (OpenAI)
 
 ```bash
@@ -201,7 +212,7 @@ cp -r . /path/to/your-project/.agents/skills/mybatis-flex-skill
 cp -r . ~/.agents/skills/mybatis-flex-skill
 ```
 
-也可通过 Codex CLI 内置的 `$skill-installer` 安装（如果技能已发布到社区）。
+**插件形态（带 hooks）**：使用构建产物 `dist/codex-plugin/`（含 `.codex-plugin/plugin.json` 与 `hooks/hooks.codex.json`），按 Codex 插件安装方式加载；hooks 逻辑与 Claude 端一致。
 
 #### OpenCode
 
@@ -236,6 +247,13 @@ lobe skill install mybatis-flex-skill
 ```
 mybatis-flex-skill/
 ├── SKILL.md
+├── .claude-plugin/plugin.json      # Claude 插件清单（可选，随目录安装即生效）
+├── hooks/
+│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit hook
+│   ├── hooks.codex.json            # Codex hook 配置
+│   └── session_activation.py       # 有界证据检测 + 激活上下文注入
+├── .codex-plugin/plugin.json       # Codex 插件清单（可选）
+├── scripts/build.py                # 多宿主分发包构建脚本
 └── references/
     ├── 00-index.md
     ├── 01-apt-configuration.md
@@ -267,6 +285,22 @@ processor.mapper.generateEnable=true
 processor.mapper.annotation=true
 processor.tableDef.package=${entityPackage}.table
 ```
+
+## 🚀 触发机制与性能
+
+插件形态（Claude Code / Codex）下，`SessionStart` / `UserPromptSubmit` hook 由本技能自带的
+`hooks/session_activation.py` 驱动，设计目标是"低噪音、快返回、跨端一致"：
+
+| 目标 | 实现 |
+|------|------|
+| 稳定触发 | `SessionStart` 覆盖 `startup`/`resume`/`clear`/`compact`/`fork` 全部会话启动方式；CLI、桌面端、IDE 扩展、SSH 远程会话行为一致（官方声明 hooks 事件在所有运行环境相同） |
+| 零噪音 | 仅当检测到 MyBatis-Flex 证据（`com.mybatisflex` 依赖、`mybatis-flex.config`、`com.mybatisflex` 导入、`application.yml` 中 `mybatis-flex:` 配置）才注入激活上下文；未命中零输出，不消耗 token |
+| 快速返回 | 有界检测：只读取候选构建文件前 256 KiB、源码扫描限制 256 个文件与 8 层深度；典型耗时 <10ms，hook 超时 5s |
+| 去重 | 同一会话只注入一次；`resume`/`clear`/`compact` 后重新检测刷新，保证恢复会话后上下文不丢失 |
+| 无状态降级 | 缺少 `CLAUDE_PLUGIN_DATA` / `PLUGIN_DATA` 时仍可无状态运行，状态文件限量 64 个且自动清理 |
+
+> 官方建议静态上下文放 `CLAUDE.md` 而非 SessionStart。本技能把"证据检测 + 激活提醒"这类动态内容放 hook，
+> 静态路由与参考文档仍放在 `SKILL.md` / `references/`（按需读取，不一次性加载）。
 
 ## 📝 功能速查
 

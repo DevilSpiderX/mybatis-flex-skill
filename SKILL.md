@@ -11,6 +11,18 @@ description: >-
 
 # MyBatis-Flex 开发技能
 
+## 激活机制
+
+- 本技能以普通 Skill（`SKILL.md` + `references/`）或插件形态分发。作为 Claude Code 插件安装（含
+  `.claude-plugin/plugin.json` 与 `hooks/hooks.json`）时，`SessionStart` / `UserPromptSubmit` hook 会在
+  会话启动或提交 prompt 时有界检测当前项目是否存在 MyBatis-Flex 证据（`com.mybatisflex` 依赖、
+  `mybatis-flex.config`、`com.mybatisflex` 导入、`application.yml` 中的 `mybatis-flex:` 配置），
+  命中时注入一段简短激活上下文；未命中时零输出，不消耗 token。
+- 若收到上述 hook 注入的激活上下文，说明项目确为 MyBatis-Flex 项目，直接按下方"工作方式"执行。
+- 本仓库可直接用于：Claude Code（`.claude/skills` 或插件）、Codex（`.codex-plugin` 或 `.agents/skills`）、
+  OpenCode（`.opencode/skills`）、LobeHub 等支持 Agent Skills 的宿主；构建脚本 `scripts/build.py` 生成
+  `dist/` 下的多宿主分发包。
+
 ## 工作方式
 
 1. 先确认项目存在 MyBatis-Flex 证据：`com.mybatisflex` 依赖、`mybatis-flex.config`、`MyBatisFlexCustomizer`、`QueryChain`、

@@ -1,0 +1,39 @@
+{
+  "name": "mybatis-flex-skill",
+  "version": "1.0.0",
+  "description": "MyBatis-Flex 开发技能：实体注解、QueryChain/UpdateChain/TableDef、APT 代码生成、逻辑删除、乐观锁、多租户、事务等 MyBatis-Flex 能力的参考。",
+  "author": {
+    "name": "lilinhan",
+    "url": "https://github.com/DevilSpiderX"
+  },
+  "homepage": "https://github.com/DevilSpiderX/mybatis-flex-skill",
+  "repository": "https://github.com/DevilSpiderX/mybatis-flex-skill",
+  "license": "MIT",
+  "keywords": [
+    "mybatis-flex",
+    "skill",
+    "java",
+    "querychain",
+    "updatechain",
+    "tabledef"
+  ],
+  "skills": "./skills/",
+  "hooks": "./hooks/hooks.codex.json",
+  "interface": {
+    "displayName": "MyBatis-Flex Skill",
+    "shortDescription": "MyBatis-Flex 后端开发技能",
+    "longDescription": "MyBatis-Flex 开发技能：处理实体注解、QueryChain/UpdateChain、TableDef、APT 代码生成、逻辑删除、乐观锁、多租户、事务等 MyBatis-Flex 能力时，按 SKILL.md 快速路由按需读取 references/ 文档。",
+    "developerName": "lilinhan",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write",
+      "Hooks"
+    ],
+    "websiteURL": "https://github.com/DevilSpiderX/mybatis-flex-skill",
+    "brandColor": "#2563EB",
+    "defaultPrompt": [
+      "使用 mybatis-flex-skill 处理 MyBatis-Flex 持久层任务（实体注解、链式查询/更新、TableDef、APT 配置等）。"
+    ]
+  }
+}
