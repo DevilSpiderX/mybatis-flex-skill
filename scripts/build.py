@@ -6,10 +6,10 @@
     python3 scripts/build.py --clean    # 先生成再校验（等效，校验始终执行）
 
 产物结构（dist/）：
-    claude-plugin/      仓库根即插件根：.claude-plugin/plugin.json + hooks/hooks.json
-                       + SKILL.md + references/（根 SKILL.md 自动作为单 skill 插件加载）
-    codex-plugin/       Codex 插件：.codex-plugin/plugin.json + hooks/hooks.codex.json
-                       + skills/mybatis-flex-skill/{SKILL.md, references/}
+    claude-plugin/      Claude 插件：.claude-plugin/plugin.json + hooks/ + SKILL.md（根）
+                       + references/（根）+ LICENSE
+    codex-plugin/       Codex 插件：.codex-plugin/plugin.json + hooks/ + LICENSE
+                       + skills/mybatis-flex-skill/{SKILL.md, agents/, references/}
     portable-skill/     纯 skill 目录：SKILL.md + references/（各宿主通用，无 hooks）
 
 仅依赖 Python 3 标准库。源文件缺失时失败退出并打印缺失项。
@@ -27,16 +27,15 @@ DIST_ROOT = REPO_ROOT / "dist"
 
 PACKAGES: dict[str, list[str]] = {
     # package: (复制规则) —— 元组为 (目标子路径, 源路径) 列表
-    # 两个宿主包内部布局保持一致：skills/<name>/ + hooks/hooks.json + LICENSE
-    # 仅 manifest 目录（.claude-plugin/ vs .codex-plugin/）与 hooks 内容不同。
+    # Claude 包：plain skill 布局（SKILL.md + references 在根目录，与参考实现一致）
+    # Codex 包：plugin skill 布局（skills/<name>/ 子目录，与参考实现一致）
     "claude-plugin": [
         (".claude-plugin/plugin.json", ".claude-plugin/plugin.json"),
         ("LICENSE", "LICENSE"),
         ("hooks/hooks.json", "hooks/hooks.json"),
         ("hooks/session_activation.py", "hooks/session_activation.py"),
-        ("skills/mybatis-flex-skill/LICENSE", "LICENSE"),
-        ("skills/mybatis-flex-skill/SKILL.md", "SKILL.md"),
-        ("skills/mybatis-flex-skill/references", "references"),
+        ("SKILL.md", "SKILL.md"),
+        ("references", "references"),
     ],
     "codex-plugin": [
         (".codex-plugin/plugin.json", ".codex-plugin/plugin.json"),
@@ -57,13 +56,19 @@ PACKAGES: dict[str, list[str]] = {
 MANIFEST_KEYS = {
     "claude-plugin": [
         ".claude-plugin/plugin.json",
+        "LICENSE",
         "hooks/hooks.json",
-        "skills/mybatis-flex-skill/SKILL.md",
+        "SKILL.md",
+        "references",
     ],
     "codex-plugin": [
         ".codex-plugin/plugin.json",
+        "LICENSE",
         "hooks/hooks.json",
+        "skills/mybatis-flex-skill/LICENSE",
         "skills/mybatis-flex-skill/SKILL.md",
+        "skills/mybatis-flex-skill/agents/openai.yaml",
+        "skills/mybatis-flex-skill/references",
     ],
     "portable-skill": ["SKILL.md"],
 }
