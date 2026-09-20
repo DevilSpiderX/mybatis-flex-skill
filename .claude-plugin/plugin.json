@@ -1,8 +1,7 @@
 {
   "name": "mybatis-flex-skill",
-  "displayName": "MyBatis-Flex Development Skill",
   "version": "1.0.0",
-  "description": "MyBatis-Flex 开发技能：实体注解、QueryChain/UpdateChain/TableDef、APT 代码生成、逻辑删除、乐观锁、多租户、事务等 MyBatis-Flex 能力的参考。通过 SessionStart hook 检测项目证据并在会话启动时注入激活上下文，支持 CLI 与 Desktop 稳定触发。",
+  "description": "MyBatis-Flex 后端开发技能，提供实体注解、QueryChain/UpdateChain/TableDef、APT 代码生成、逻辑删除、乐观锁、多租户、事务等能力的参考与最佳实践。",
   "author": {
     "name": "lilinhan",
     "url": "https://github.com/DevilSpiderX"
