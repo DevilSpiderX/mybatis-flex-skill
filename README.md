@@ -142,6 +142,7 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 | [12-optional-field.md](references/12-optional-field.md) | OptionalField 三态值类型（**项目侧能力，非框架 API**） |
 | [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField 源码实现（**项目侧代码，非框架源码**） |
 | [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil 事务工具类（**项目侧能力**；框架原生编程式事务为 `Db.tx`） |
+| [14-entity-diff-util.md](references/14-entity-diff-util.md) | EntityDiffUtil 实体差异比较与增量更新（**项目侧能力，非框架 API**） |
 
 ## 📋 常用导入
 

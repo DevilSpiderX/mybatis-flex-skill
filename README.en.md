@@ -155,6 +155,7 @@ See the `references/` directory for details:
 | [12-optional-field.md](references/12-optional-field.md) | OptionalField tri-state type (**project-side capability, not a framework API**) |
 | [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField source code implementation (**project-side code, not framework source**) |
 | [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil transaction utility (**project-side capability**; the framework-native programmatic API is `Db.tx`) |
+| [14-entity-diff-util.md](references/14-entity-diff-util.md) | EntityDiffUtil entity diff & incremental update (**project-side capability, not a framework API**) |
 
 ## 📋 Common Imports
 
