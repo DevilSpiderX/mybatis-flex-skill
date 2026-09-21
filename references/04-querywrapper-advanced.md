@@ -122,7 +122,7 @@ QueryWrapper.create()
         upper(ACCOUNT.USER_NAME),
         lower(ACCOUNT.USER_NAME),
         length(ACCOUNT.USER_NAME),
-        concat(ACCOUNT.USER_NAME, " - ", ACCOUNT.AGE),
+        concat(ACCOUNT.USER_NAME, string(" - "), ACCOUNT.AGE),
         substring(ACCOUNT.USER_NAME, 1, 3)
     )
     .from(ACCOUNT);
@@ -133,7 +133,7 @@ QueryWrapper.create()
         year(ACCOUNT.BIRTHDAY),
         month(ACCOUNT.BIRTHDAY),
         day(ACCOUNT.BIRTHDAY),
-        curdate(),
+        curDate(),
         now()
     )
     .from(ACCOUNT);
@@ -142,15 +142,14 @@ QueryWrapper.create()
 QueryWrapper.create()
     .select(
         coalesce(ACCOUNT.NICK_NAME, ACCOUNT.USER_NAME),
-        if_(ACCOUNT.AGE.ge(18), "成年", "未成年"),
-        nullif(ACCOUNT.AGE, 0)
+        if_(ACCOUNT.AGE.ge(18), "成年", "未成年")
     )
     .from(ACCOUNT);
 
 // 格式化
 QueryWrapper.create()
     .select(
-        format(ACCOUNT.SALARY, 2),
+        format(ACCOUNT.SALARY, number(2)),
         round(ACCOUNT.SCORE, 2),
         floor(ACCOUNT.SCORE),
         ceil(ACCOUNT.SCORE),
@@ -158,6 +157,12 @@ QueryWrapper.create()
     )
     .from(ACCOUNT);
 ```
+
+> **坑点**（源码位置均为 mybatis-flex-core/src/main/java/com/mybatisflex/core/query/QueryMethods.java）：
+> - 当前日期方法是 `curDate()`（:1192），Java 大小写敏感，不存在小写的 `curdate()`。
+> - `concat` 只有「全 String」（:732）和「全 QueryColumn」（:739）两组重载；混合字符串字面量与列时必须用 `string(" - ")`（:2430）转为查询列。
+> - `format` 没有 `(QueryColumn, int)` 重载，只有 `(String, String)`（:2070）、`(QueryColumn, QueryColumn)`（:2077）、`(LambdaGetter, LambdaGetter)`（:2084）；位数参数要用 `number(2)`（:2423）转成查询列。`round` 才有 `(QueryColumn, Integer)` 重载（:274）。
+> - 1.11.8 的 `QueryMethods` 没有 `nullif`（全量检索无 NULLIF），不要调用；确需 `NULLIF` 时用原生 SQL 或原生列实现。
 
 ### Case When
 
@@ -243,20 +248,22 @@ QueryWrapper query = QueryWrapper.create()
 ## Union 查询
 
 ```java
-// Union（去重）
+// Union（去重）：union(QueryWrapper) 每次传入一个查询
 QueryWrapper query1 = QueryWrapper.create()
     .select().from(ACCOUNT).where(ACCOUNT.AGE.ge(18));
-    
+
 QueryWrapper query2 = QueryWrapper.create()
     .select().from(ACCOUNT).where(ACCOUNT.DEPT_ID.eq(1));
 
-List<QueryWrapper> unions = new ArrayList<>();
-unions.add(query2);
-QueryWrapper query = query1.union(unions);
+QueryWrapper query = query1.union(query2);
 
 // Union All（不去重）
-QueryWrapper query = query1.unionAll(unions);
+QueryWrapper queryAll = query1.unionAll(query2);
 ```
+
+> **注意**：`union` / `unionAll` 只接受单个 `QueryWrapper` 参数
+> （mybatis-flex-core/src/main/java/com/mybatisflex/core/query/QueryWrapper.java:610、618），
+> **没有 `union(List<QueryWrapper>)` 重载**；多个 UNION 请链式调用 `query1.union(q2).union(q3)`。
 
 ## 自定义排序
 
@@ -275,13 +282,8 @@ QueryWrapper query = QueryWrapper.create()
 
 ## With ROLLUP
 
-```java
-QueryWrapper query = QueryWrapper.create()
-    .select(ACCOUNT.DEPT_ID, ACCOUNT.AGE, count())
-    .from(ACCOUNT)
-    .groupBy(ACCOUNT.DEPT_ID, ACCOUNT.AGE)
-    .withRollup();
-```
+**1.11.8 的 `QueryWrapper` 没有 `withRollup()` 方法**（对 mybatis-flex-core 全量检索无任何 ROLLUP 相关 API）。
+需要 `GROUP BY ... WITH ROLLUP` 时请改用原生 SQL（`@Select` 注解或 XML），不要调用不存在的方法。
 
 ## FOR UPDATE
 
@@ -294,19 +296,26 @@ QueryWrapper query = QueryWrapper.create()
 
 ## Distinct 去重查询
 
+`QueryWrapper` 和 `QueryColumn` 上**没有 `distinct()` 方法**；去重列使用
+`QueryMethods.distinct(...)`（mybatis-flex-core/src/main/java/com/mybatisflex/core/query/QueryMethods.java:2359、2364，
+需静态导入 `com.mybatisflex.core.query.QueryMethods`）。
+
 ```java
+import static com.mybatisflex.core.query.QueryMethods.*;
+
 // 基础 distinct
 QueryWrapper query = QueryWrapper.create()
-    .select(ACCOUNT.DEPT_ID).distinct()
+    .select(distinct(ACCOUNT.DEPT_ID))
     .from(ACCOUNT);
 
-// distinct 配合聚合
+// 多列去重
 QueryWrapper query = QueryWrapper.create()
-    .select(
-        count(ACCOUNT.DEPT_ID).distinct().as("deptCount")
-    )
+    .select(distinct(ACCOUNT.DEPT_ID, ACCOUNT.SEX))
     .from(ACCOUNT);
 ```
+
+> **注意**：`COUNT(DISTINCT col)` 没有专用封装，可用原生列
+> `column("COUNT(DISTINCT dept_id)")`（QueryMethods.column，QueryMethods.java:2444 起）或原生 SQL 实现。
 
 ## Select 别名（as）
 
@@ -357,16 +366,20 @@ QueryWrapper query = QueryWrapper.create()
 
 ## last() 追加 SQL
 
-在 SQL 末尾追加自定义内容，常用于 `LIMIT`、`FOR UPDATE` 等场景。
+**1.11.8 的 `QueryWrapper` 没有 `last()` 方法**（对 mybatis-flex-core 全量检索无该方法）。
+末尾追加 SQL 的官方能力只有内置的锁定子句：
 
 ```java
+// FOR UPDATE / FOR UPDATE NOWAIT（QueryWrapper.java:626、631）
 QueryWrapper query = QueryWrapper.create()
     .select().from(ACCOUNT)
-    .where(ACCOUNT.AGE.ge(18))
-    .last("LIMIT 1");
+    .where(ACCOUNT.ID.eq(1))
+    .forUpdate();
 ```
 
-> **注意**：`last()` 存在 SQL 注入风险，请勿将用户输入直接传入。
+其他"末尾追加 SQL"的场景（如 LIMIT 1）请使用 `limit()` / `offset()`
+（mybatis-flex-core/src/main/java/com/mybatisflex/core/query/QueryWrapper.java:815、824），
+或改用原生 SQL；不要臆造 `last("...")` 拼接方法。
 
 ## QueryWrapper 克隆
 
@@ -375,7 +388,6 @@ QueryWrapper query = QueryWrapper.create()
 ```java
 QueryWrapper queryWrapper = QueryWrapper.create()
     .from(ACCOUNT)
-    .select(ACCOUNT.DEFAULT_COLUMNS)
     .where(ACCOUNT.ID.eq(1));
 
 QueryWrapper clone = queryWrapper.clone();
@@ -501,15 +513,18 @@ QueryWrapper qw = QueryWrapper.create().select().from(ACCOUNT)
     .where(ACCOUNT.ID.in(ids));
 // SQL: SELECT * FROM tb_account WHERE id = 1
 
-List<Integer> ids = Arrays.asList(1, 2, 3);
-QueryWrapper qw = QueryWrapper.create().select().from(ACCOUNT)
-    .where(ACCOUNT.ID.in(ids));
+List<Integer> ids2 = Arrays.asList(1, 2, 3);
+QueryWrapper qw2 = QueryWrapper.create().select().from(ACCOUNT)
+    .where(ACCOUNT.ID.in(ids2));
 // SQL: SELECT * FROM tb_account WHERE id IN (1, 2, 3)
 ```
 
 ## toSQL() 调试
 
 使用 `toSQL()` 方法可以查看 QueryWrapper 生成的 SQL 语句，便于调试。
+注意 `toSQL()` 会把参数值替换进 SQL（`SqlUtil.replaceSqlParams`，
+mybatis-flex-core/src/main/java/com/mybatisflex/core/util/SqlUtil.java:121），
+字符串参数会带上单引号。
 
 ```java
 QueryWrapper query = QueryWrapper.create()
@@ -518,5 +533,5 @@ QueryWrapper query = QueryWrapper.create()
     .and(ACCOUNT.USER_NAME.like("michael"));
 
 System.out.println(query.toSQL());
-// 输出: SELECT * FROM tb_account WHERE id >= ? AND user_name LIKE ?
+// 输出: SELECT * FROM tb_account WHERE id >= 100 AND user_name LIKE 'michael'
 ```

@@ -1,6 +1,10 @@
 # MyBatis-Flex 核心源码解析 — 查询（QueryWrapper / 链式查询）
 
+> 源码位置：`QueryWrapper`（com/mybatisflex/core/query/QueryWrapper.java:34，`extends BaseQueryWrapper<QueryWrapper>`）、`BaseQueryWrapper`（BaseQueryWrapper.java:26）、`QueryWrapperAdapter`（QueryWrapperAdapter.java:36）、`ChainQuery`（ChainQuery.java:38）、`MapperQueryChain`（MapperQueryChain.java:44）、`QueryChain`（QueryChain.java:30）。版本基线 1.11.8。
+
 ## QueryWrapper - 核心查询方法
+
+> 源码位置：QueryWrapper.java L34-2684；`create()` 系列工厂方法在 L36-81；MyBatis-Plus 兼容 WHERE 方法在 L850-2116；JOIN 方法在 L442-608；`groupBy`/`having`/`orderBy` 在 L661-762；`limit`/`offset`/`datasource`/`hint` 在 L815-847；`toSQL()` 在 L2666。
 
 ### 创建方式
 
@@ -38,9 +42,18 @@ QueryWrapper.create(map)
 | `isNull(col)` | `col IS NULL` | 空值判断 |
 | `isNotNull(col)` | `col IS NOT NULL` | 非空判断 |
 
-每个方法都有带 `isEffective` 参数的重载，支持 `boolean`、`BooleanSupplier`、`Predicate<V>` 三种形式，配合 `If` 工具类可实现动态条件控制（详见上方 **If - 条件判断工具类** 章节）。
+以上每个方法都有 `String` 列名与 `LambdaGetter` 两种形式，并配有带 `isEffective` 参数的重载，但**不同方法组支持的重载形式并不相同**（源码 QueryWrapper.java）：
+
+- 带值条件（`eq`/`ne`/`gt`/`ge`/`lt`/`le`/`like`/`likeLeft`/`likeRight`/`notLike`）：`boolean` 与 `Predicate<V>`（以 `eq` 为例，L858-924）；
+- `between`/`notBetween`：`boolean` 与 `BooleanSupplier`（L1693-1842，如 `between(String, Object, Object, boolean)` L1717、`notBetween(String, Object, Object, BooleanSupplier)` L1828）；
+- `in`/`notIn`：`boolean` 与 `BooleanSupplier`，但 `BooleanSupplier` 仅出现在子查询（`QueryWrapper` 值）形式上（`in` L1484-1498、`notIn` L1664-1678），`Object[]`/`Collection` 值形式只有 `boolean`（如 `in(String, Object[], boolean)` L1402）；
+- `isNull`/`isNotNull`：`boolean` 与 `BooleanSupplier`（L2329-2394、L2402-2462）。
+
+配合 `If` 工具类可实现动态条件控制（详见 **11d-source-api.md — If 条件判断工具类**）。注意 `QueryColumn` 侧的对应签名略有差异：`between` 的条件参数是 `BiPredicate` 而非 `Predicate`（QueryColumn.java:586）。
 
 ### JOIN 方法
+
+> 源码位置：QueryWrapper.java L442-608。每个 JOIN 都有 `QueryTable` / `String` / `Class<?>` / `QueryWrapper` 四类入参重载，以及带 `boolean when` 的动态重载；返回 `Joiner<Q>` 用于继续拼接 `ON` 条件。
 
 | 方法 | 说明 |
 |------|------|
@@ -53,11 +66,13 @@ QueryWrapper.create(map)
 
 ### 其他方法
 
+> 源码位置：`groupBy` L661-695、`having` L697、`orderBy` L716-762、`limit`/`offset` L815-837、`datasource` L839、`hint` L844、`union`/`unionAll` L610-624、`forUpdate` L626、`toSQL` L2666。
+
 | 方法 | 说明 |
 |------|------|
 | `groupBy(col)` | 分组 |
 | `having(condition)` | HAVING 条件 |
-| `orderBy(col, asc)` | 排序（支持动态 Boolean） |
+| `orderBy(col, asc)` | 排序（支持动态 Boolean，`asc` 为 `null` 时不排序） |
 | `limit(rows)` | 限制行数 |
 | `offset(offset)` | 偏移量 |
 | `union(wrapper)` | UNION |
@@ -70,6 +85,8 @@ QueryWrapper.create(map)
 ---
 
 ## ChainQuery - 链式查询接口
+
+> 源码位置：ChainQuery.java L38-110。`one()`、`oneAs()`、`list()`、`listAs()`、`page()`、`pageAs()` 为接口抽象方法；`oneOpt()`、`oneAsOpt()` 为 `default` 方法。
 
 `ChainQuery<T>` 是链式查询的基础接口，定义了通用查询方法：
 
@@ -87,6 +104,8 @@ QueryWrapper.create(map)
 ---
 
 ## MapperQueryChain - Mapper 链式查询
+
+> 源码位置：MapperQueryChain.java L44-216，`public interface MapperQueryChain<T> extends ChainQuery<T>`。
 
 `MapperQueryChain<T>` 继承 `ChainQuery`，扩展了更多方法：
 
@@ -107,6 +126,8 @@ QueryWrapper.create(map)
 ---
 
 ## QueryChain - QueryWrapper 链式调用
+
+> 源码位置：QueryChain.java L30-64，`public class QueryChain<T> extends QueryWrapperAdapter<QueryChain<T>> implements MapperQueryChain<T>`。
 
 `QueryChain<T>` 继承 `QueryWrapperAdapter`，实现 `MapperQueryChain`，是完整的链式查询实现。
 
@@ -151,12 +172,14 @@ String name = (String) QueryChain.of(accountMapper)
     .where(ACCOUNT.ID.eq(1))
     .obj();
 
-// 关联查询
+// 关联查询（Relations Query：QueryChain 本身没有 listWithRelationsAs 方法，
+// 需通过 withRelations() 拿到 RelationsBuilder 后再调用 listAs）
 List<AccountVO> list = QueryChain.of(accountMapper)
     .select()
     .from(ACCOUNT)
     .where(ACCOUNT.AGE.ge(18))
-    .listWithRelationsAs(AccountVO.class);
+    .withRelations()
+    .listAs(AccountVO.class);
 ```
 
 > 类继承关系图和参考来源见 [11-source-api.md](11-source-api.md)。

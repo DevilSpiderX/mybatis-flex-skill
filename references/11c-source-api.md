@@ -1,6 +1,10 @@
 # MyBatis-Flex 核心源码解析 — 更新（PropertySetter / UpdateWrapper / UpdateChain）
 
+> 源码位置：`PropertySetter`（com/mybatisflex/core/update/PropertySetter.java:32）、`UpdateWrapper`（update/UpdateWrapper.java:35）、`UpdateChain`（update/UpdateChain.java:40）。版本基线 1.11.8。
+
 ## PropertySetter - 属性设置接口
+
+> 源码位置：PropertySetter.java L32-280，`public interface PropertySetter<R>`。`set`/`setRaw` 各有 3 组（`String` / `QueryColumn` / `LambdaGetter`）× 4 种形式（无 `isEffective`、`boolean`、`BooleanSupplier`、`Predicate<V>`）共 12 个方法，其中仅 `boolean` 形式为抽象方法，其余均为 `default`。
 
 `PropertySetter<R>` 是通用的属性设置接口，定义了 `set` 和 `setRaw` 方法族，供 `UpdateChain` 和 `UpdateWrapper` 共享。支持三种属性引用方式：**字符串名**、**QueryColumn**、**LambdaGetter**。
 
@@ -11,7 +15,11 @@
 | `set(property, value)` | 设置字段参数值 | 普通值直接绑定；若 value 为 `QueryWrapper`/`QueryColumn`/`QueryCondition`，自动包装为 `RawValue` |
 | `setRaw(property, value)` | 设置字段原生值 | 始终包装为 `RawValue`，不走参数占位符，直接拼入 SQL |
 
+> 上述"RawValue 自动包装"行为由 `UpdateWrapper` 的 `default` 实现提供（UpdateWrapper.java:50-114），`UpdateChain` 通过委托 `entityWrapper` 复用同一逻辑（UpdateChain.java:93-128）。
+
 ### 属性引用方式
+
+> 源码位置：`set(String, ...)` PropertySetter.java:40-73、`set(QueryColumn, ...)` L81-114、`set(LambdaGetter<T>, ...)` L122-155；`setRaw` 对应为 L163-196、L204-237、L245-278。
 
 ```java
 // 1. 字符串属性名
@@ -56,11 +64,13 @@
 
 ## UpdateWrapper - 更新包装器接口
 
+> 源码位置：UpdateWrapper.java L35-134，`public interface UpdateWrapper<T> extends PropertySetter<UpdateWrapper<T>>, Serializable`。
+
 `UpdateWrapper<T>` 是实体代理对象的更新接口，继承 `PropertySetter<UpdateWrapper<T>>`，同时实现 `Serializable`。
 
 ### 核心机制
 
-`UpdateWrapper` 通过代理对象（Javassist `ProxyObject` 或 `Proxy`）获取 `ModifyAttrsRecordHandler`，从而维护一个 `Map<String, Object>` 存储待更新字段。
+`UpdateWrapper` 通过代理对象（Javassist `ProxyObject` 或 `org.apache.ibatis.javassist.util.proxy.Proxy`，见 UpdateWrapper.java:25 的 import）获取 `ModifyAttrsRecordHandler`，从而维护一个 `Map<String, Object>` 存储待更新字段。
 
 ### set 方法自动识别
 
@@ -93,6 +103,8 @@ UpdateWrapper<Account> wrapper = UpdateWrapper.of(Account.class);
 
 ### 关键方法
 
+> 源码位置：`getUpdates()` L37-47、`set(String, Object, boolean)` L50-61、`set(QueryColumn, ...)` L64-75、`set(LambdaGetter, ...)` L78-89、`setRaw(...)` L92-114、`of(T entity)` L117-123、`of(Class<T>)` L125-127、`toEntity()` L130-132。
+
 | 方法 | 返回类型 | 说明 |
 |------|----------|------|
 | `getUpdates()` | `Map<String, Object>` | 获取所有待更新的字段-值映射 |
@@ -104,9 +116,13 @@ UpdateWrapper<Account> wrapper = UpdateWrapper.of(Account.class);
 
 ## UpdateChain - 数据更新/删除链式操作
 
+> 源码位置：UpdateChain.java L40-153，`public class UpdateChain<T> extends QueryWrapperAdapter<UpdateChain<T>> implements PropertySetter<UpdateChain<T>>`。
+
 `UpdateChain<T>` 继承 `QueryWrapperAdapter<UpdateChain<T>>`，实现 `PropertySetter<UpdateChain<T>>`，用于链式构建 UPDATE 和 DELETE 语句。
 
 ### 创建方式
+
+> 源码位置：`of(Class<T>)` L46-49、`of(BaseMapper<T>)` L51-53、`of(T entityObject)` L55-59、`of(T, BaseMapper<T>)` L61-63。
 
 ```java
 // 通过实体类
@@ -124,12 +140,14 @@ UpdateChain.of(accountObject, accountMapper)
 
 ### UPDATE 链式操作
 
+> 注意：`QueryWrapper` 没有 `where(LambdaGetter, Object)` 重载，`where(LambdaGetter)` 返回 `QueryConditionBuilder`（QueryWrapper.java:296），Lambda 条件需写成 `.where(Account::getId).eq(1)`。
+
 ```java
 // 基础更新
 boolean success = UpdateChain.of(Account.class)
     .set(Account::getUserName, "新名字")
     .set(Account::getAge, 25)
-    .where(Account::getId, 1)
+    .where(Account::getId).eq(1)
     .update();
 
 // 条件生效控制
@@ -162,13 +180,15 @@ boolean success = UpdateChain.of(Account.class)
     .where(ACCOUNT.STATUS.eq(-1))
     .remove();
 
-// Lambda 方式
+// Lambda 方式（where(LambdaGetter) 返回 QueryConditionBuilder）
 boolean success = UpdateChain.of(Account.class)
-    .where(Account::getStatus, -1)
+    .where(Account::getStatus).eq(-1)
     .remove();
 ```
 
 ### 核心方法
+
+> 源码位置：`set` L94-109、`setRaw` L113-128、`remove()` L131-133、`update()` L136-138、`toSQL()` L142-151。
 
 | 方法 | 返回类型 | 说明 |
 |------|----------|------|

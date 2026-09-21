@@ -1,6 +1,15 @@
 # OptionalField 源码实现
 
-本文档包含 `OptionalField` 三态值类型的核心实现代码。
+> 🚫 **项目侧源码，非 MyBatis-Flex 框架源码**：`OptionalField`（`com.example.json.lang`）与
+> `OptionalDtoUtil`（`com.example.mybatisflex.util`）在 MyBatis-Flex 1.11.8 源码中均不存在（检索无结果），
+> 是项目侧自研工具。本文档提供可直接复制到项目的实现；与框架的唯一接缝是
+> `com.mybatisflex.core.util.UpdateEntity`，其真实签名为：
+> - `UpdateEntity.of(Class<T>)` —— `mybatis-flex-core/src/main/java/com/mybatisflex/core/util/UpdateEntity.java:34`
+> - `UpdateEntity.of(Class<T> clazz, Object id)` —— 同上文件 `:40`（按实体主键列表回填 id，支持复合主键）
+>
+> 与本文 `OptionalDtoUtil.toUpdateEntity(dto, clazz)` / `toUpdateEntity(dto, clazz, id)` 的用法兼容。
+
+本文档包含 `OptionalField` 三态值类型的核心实现代码（项目侧实现，非框架代码）。
 
 > **架构说明**：`OptionalField` 采用 **sealed class 层次结构**，将三态行为分布到三个 final 子类中，
 > 避免运行时 switch/enum 分支判断，每个子类直接实现对应状态的语义。

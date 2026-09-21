@@ -19,7 +19,7 @@ accountMapper.deleteByQuery(queryWrapper);
 - `insert(entity)` 不忽略 null。
 - `insertSelective(entity)` 忽略 null，数据库默认值才会生效。
 - `update(entity)` 根据主键更新，实体属性为 null 时默认不更新。
-- 显式更新部分字段为 null 时，使用 `UpdateEntity` 或 `OptionalField`。
+- 显式更新部分字段为 null 时，使用 `UpdateEntity`（`UpdateEntity.of(Account.class)` / `UpdateEntity.ofNotNull(entity)`，源码 `mybatis-flex-core/src/main/java/com/mybatisflex/core/util/UpdateEntity.java:34-100`）；源码中不存在 `OptionalField`，不要使用。
 
 ## 基础查询
 
@@ -69,10 +69,13 @@ Relations 注解不会在普通查询中自动生效，必须调用 withRelation
 ```java
 Account account = accountMapper.selectOneWithRelationsById(id);
 
-AccountVO vo = accountMapper.queryChain()
+AccountVO vo = QueryChain.of(accountMapper)
     .where(ACCOUNT.ID.eq(id))
-    .oneWithRelationsAs(AccountVO.class);
+    .withRelations()
+    .oneAs(AccountVO.class);
 ```
+
+> 坑点：`BaseMapper` 没有 `queryChain()` 方法（1.11.8 源码 `mybatis-flex-core/src/main/java/com/mybatisflex/core/BaseMapper.java` 中不存在），链式入口是 `QueryChain.of(accountMapper)` 或 `QueryChain.of(Account.class)`（`mybatis-flex-core/src/main/java/com/mybatisflex/core/query/QueryChain.java:38-45`）；链式关联查询用 `withRelations()` 后接 `oneAs` / `listAs`（`mybatis-flex-core/src/main/java/com/mybatisflex/core/query/RelationsBuilder.java:94-96`），不存在 `oneWithRelationsAs`。
 
 ## 批量操作
 
@@ -102,21 +105,27 @@ Account account = result.toEntity(Account.class);
 
 ## Active Record
 
-Entity 继承 `Model` 后可以使用 Active Record 风格。项目中仍必须注入对应实体的 `BaseMapper`。
+Entity 继承 `Model` 后可以使用 Active Record 风格。`Model` 会通过 `Mappers.ofEntityClass` 自动解析对应实体的 `BaseMapper`（源码 `mybatis-flex-core/src/main/java/com/mybatisflex/core/activerecord/MapperModel.java:46-48`），框架层面不需要手动注入 Mapper。
 
 ```java
 public class Account extends Model<Account> {
 }
 
-Account.create()
-    .setAge(100)
-    .where(Account::getId).eq(1L)
-    .update();
+// 按主键更新（默认忽略 null）
+Account account = new Account();
+account.setAge(100);
+account.updateById();
 
-Account account = Account.create()
-    .where(Account::getId).eq(1L)
-    .one();
+// 条件更新：实例的非 null 字段作为 SET 值，where 构建 WHERE 条件
+Account toUpdate = new Account();
+toUpdate.setAge(100);
+toUpdate.where(Account::getId).eq(1L).update();
+
+// 条件查询一条
+Account one = new Account().where(Account::getId).eq(1L).one();
 ```
+
+> 坑点：`Model` 没有静态 `create()` 方法（`mybatis-flex-core/src/main/java/com/mybatisflex/core/activerecord/Model.java` 与同包 `query/QueryModel.java` 中均不存在），直接 `new` 实体即可；`updateById()` 见 `MapperModel.java:177-179`，`update()` 见 `Model.java:92-94`，`one()` 见 `mybatis-flex-core/src/main/java/com/mybatisflex/core/query/MapperQueryChain.java:82-84`。
 
 若项目已经采用分层 Service/Mapper，除非现有代码就是 Active Record 风格，否则不要新引入这种写法。
 

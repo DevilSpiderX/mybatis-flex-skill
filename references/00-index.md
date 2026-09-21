@@ -14,7 +14,7 @@
 | 链式操作 | `05-querychain.md`、`06-updatechain.md` | 查询用 `QueryChain`，更新用 `UpdateChain` |
 | QueryWrapper | `04-querywrapper-advanced.md`、`11-source-api.md` | 复杂 SQL、子查询、函数、动态条件 |
 | Db + Row | `03-basic-features.md`、`09-service-mapper.md` | 无实体表、原生 SQL、通用 Row 场景 |
-| Active Record | `03-basic-features.md` | Entity 继承 `Model`，仍需注入对应 `BaseMapper` |
+| Active Record | `03-basic-features.md` | Entity 继承 `Model`，`Model` 自动解析对应 `BaseMapper`，无需手动注入 |
 | IService | `03-basic-features.md`、`09-service-mapper.md` | 本项目默认 Service 直接注入 Mapper，除非既有代码已采用 IService |
 | SpringBoot 配置文件 | `03-basic-features.md` | 数据源、MyBatis-Flex 配置、SQL 打印等 |
 | MyBatisFlexCustomizer | `03-basic-features.md`、`07-core-features.md` | 全局配置、主键生成、多租户、动态表名、审计、打印 |

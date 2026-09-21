@@ -114,22 +114,24 @@ processor.mapper.annotation=true
 
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `processor.enable` | `true` | 全局启用 APT |
+| `processor.enable` | 启用（默认值为空字符串，仅显式设为 `false` 时关闭） | 全局启用 APT |
 | `processor.stopBubbling` | `false` | 是否停止向上级目录合并配置 |
-| `processor.genPath` | `target/generated-sources/annotations` | APT 代码生成路径，可为绝对或相对路径 |
+| `processor.genPath` | 空字符串 | 未配置时走 Filer 默认输出目录（Maven 编译插件下即 `target/generated-sources/annotations`）；可配置为绝对路径或相对项目根目录的路径 |
 | `processor.charset` | `UTF-8` | 生成文件字符集 |
 | `processor.allInTables.enable` | `false` | 是否把所有表辅助变量生成到统一 `Tables` 类 |
-| `processor.allInTables.package` | `${entityPackage}.table` | `Tables` 包名 |
+| `processor.allInTables.package` | 未配置时取最后一个被处理的实体所在包 | `Tables` 包名；单包项目等价于 `${entityPackage}.table` |
 | `processor.allInTables.className` | `Tables` | `Tables` 类名 |
 | `processor.mapper.generateEnable` | `false` | 是否启用 Mapper 自动生成 |
 | `processor.mapper.annotation` | `false` | 生成的 Mapper 是否添加 `@Mapper` |
 | `processor.mapper.baseClass` | `com.mybatisflex.core.BaseMapper` | 生成 Mapper 的父接口 |
-| `processor.mapper.package` | `${entityPackage}.mapper` | 生成 Mapper 的包名 |
+| `processor.mapper.package` | `${entityPackage.parent}.mapper` | 生成 Mapper 的包名（Entity 上一级包 + `.mapper`） |
 | `processor.tableDef.package` | `${entityPackage}.table` | 生成 TableDef 的包名 |
 | `processor.tableDef.propertiesNameStyle` | `upperCase` | TableDef 字段风格 |
 | `processor.tableDef.instanceSuffix` | 空字符串 | 表实例变量后缀 |
 | `processor.tableDef.classSuffix` | `TableDef` | TableDef 类名后缀 |
-| `processor.tableDef.ignoreEntitySuffixes` | - | 生成类名时忽略的 Entity 后缀 |
+| `processor.tableDef.ignoreEntitySuffixes` | 空字符串 | 生成类名时忽略的 Entity 后缀，多个用英文逗号分隔 |
+
+以上配置项定义见 `mybatis-flex-processor/src/main/java/com/mybatisflex/processor/config/ConfigurationKey.java:30-103`；`processor.stopBubbling` 不在该枚举中，以原始键名在 `mybatis-flex-processor/src/main/java/com/mybatisflex/processor/config/MybatisFlexConfig.java:84` 处理；默认生效逻辑见 `mybatis-flex-processor/src/main/java/com/mybatisflex/processor/MybatisFlexProcessor.java:94-216`。
 
 不要使用未在官方 APT 文档中出现的伪配置项，例如 `processor.entity.generateEnable`、`processor.entity.package`、`processor.mapper.generateInclude`、`processor.mapper.generateExclude`。如果要关闭单个实体的 Mapper 生成，优先使用实体注解配置，例如 `@Table(mapperGenerateEnable = false)`。
 
@@ -161,6 +163,15 @@ public class Account extends BaseEntity {
 }
 ```
 
+> **主键生成器推荐用法**：统一使用 08 文档中的项目侧 `UUIDv7KeyGenerator`
+> （实现与注册见 [08-base-entities.md](08-base-entities.md)：实现 `IKeyGenerator`，启动时经
+> `KeyGeneratorFactory.register(UUIDv7KeyGenerator.NAME, new UUIDv7KeyGenerator())` 注册），
+> 生成去横线的 32 位时间有序 UUIDv7，数据库列类型 `char(32)`。
+> 不建议直接使用框架内置的 `com.mybatisflex.core.keygen.KeyGenerators` 常量类
+> （`uuid`/`flexId`/`snowFlakeId`/`ulid`，源码 `mybatis-flex-core/src/main/java/com/mybatisflex/core/keygen/KeyGenerators.java:27-45`）：
+> 一是项目统一 UUIDv7 规范，二是框架没有 UUIDv7 内置生成器，必须用项目侧生成器。
+> `KeyType.Generator` 的 `value` 就是生成器名称字符串。
+
 默认生成的 `TableDef` 形态接近：
 
 ```java
@@ -171,10 +182,15 @@ public class AccountTableDef extends TableDef {
     public final QueryColumn USER_NAME = new QueryColumn(this, "user_name");
     public final QueryColumn AGE = new QueryColumn(this, "age");
     
-    // 所有列
-    public final QueryColumn[] ALL_COLUMNS = {ID, USER_NAME, AGE};
+    // 所有列：单个 QueryColumn，SQL 值为 "*"（不是数组）
+    public final QueryColumn ALL_COLUMNS = new QueryColumn(this, "*");
+    
+    // 默认字段：QueryColumn 数组，不含逻辑删除字段和大字段
+    public final QueryColumn[] DEFAULT_COLUMNS = {ID, USER_NAME, AGE};
 }
 ```
+
+生成逻辑源码：`mybatis-flex-processor/src/main/java/com/mybatisflex/processor/builder/ContentBuilder.java:116`（`ALL_COLUMNS`）与 `ContentBuilder.java:130`（`DEFAULT_COLUMNS`）。
 
 默认命名规则：
 
@@ -218,11 +234,13 @@ QueryWrapper query = QueryWrapper.create()
 链式查询：
 
 ```java
-List<Account> accounts = accountMapper.queryChain()
+List<Account> accounts = QueryChain.of(accountMapper)
     .select(ACCOUNT.DEFAULT_COLUMNS)
     .where(ACCOUNT.USER_NAME.like(keyword, If::hasText))
     .list();
 ```
+
+> 坑点：`BaseMapper` 没有 `queryChain()` 方法（1.11.8 源码 `mybatis-flex-core/src/main/java/com/mybatisflex/core/BaseMapper.java` 中不存在），链式查询入口是 `QueryChain.of(accountMapper)` 或 `QueryChain.of(Account.class)`，见 `mybatis-flex-core/src/main/java/com/mybatisflex/core/query/QueryChain.java:38-45`。
 
 链式更新：
 
@@ -250,10 +268,10 @@ processor.mapper.annotation=true
 processor.mapper.baseClass=com.example.common.mapper.MyBaseMapper
 ```
 
-如果希望 Mapper 生成到 Entity 的上级包下：
+默认情况下，Mapper 就生成到 Entity 的上一级包（`${entityPackage.parent}.mapper`，见 `mybatis-flex-processor/src/main/java/com/mybatisflex/processor/util/StrUtil.java:111-122`），无需显式配置。只有需要生成到其他位置时才配置，例如与 Entity 同包：
 
 ```properties
-processor.mapper.package=${entityPackage.parent}.mapper
+processor.mapper.package=${entityPackage}.mapper
 ```
 
 Service 层仍按项目既有风格注入 Mapper；不要因为启用了自动生成 Mapper 就引入 `IService` 继承链。

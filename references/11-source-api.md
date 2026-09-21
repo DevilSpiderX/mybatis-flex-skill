@@ -13,6 +13,15 @@
 
 ## 类继承关系
 
+> 均已按源码核实（版本基线 1.11.8）：
+> `PropertySetter` 为接口（update/PropertySetter.java:32）；
+> `UpdateWrapper<T> extends PropertySetter<UpdateWrapper<T>>, Serializable`（update/UpdateWrapper.java:35）；
+> `ChainQuery<T>` 为接口（query/ChainQuery.java:38），`MapperQueryChain<T> extends ChainQuery<T>`（query/MapperQueryChain.java:44）；
+> `BaseQueryWrapper<T extends BaseQueryWrapper<T>>`（query/BaseQueryWrapper.java:26），`QueryWrapper extends BaseQueryWrapper<QueryWrapper>`（query/QueryWrapper.java:34）；
+> `QueryWrapperAdapter<R extends QueryWrapperAdapter<R>> extends QueryWrapper`（query/QueryWrapperAdapter.java:36）；
+> `QueryChain<T> extends QueryWrapperAdapter<QueryChain<T>> implements MapperQueryChain<T>`（query/QueryChain.java:30）；
+> `UpdateChain<T> extends QueryWrapperAdapter<UpdateChain<T>> implements PropertySetter<UpdateChain<T>>`（update/UpdateChain.java:40）。
+
 ```
 PropertySetter<R>                   # 属性设置接口（set / setRaw）
 
@@ -34,3 +43,4 @@ BaseQueryWrapper<T>                 # 基础查询包装器
 ## 参考来源
 
 - 包路径：`com.mybatisflex.core.query`、`com.mybatisflex.core.update`
+- 源码版本：MyBatis-Flex 1.11.8（根 pom.xml:73 `<revision>`）

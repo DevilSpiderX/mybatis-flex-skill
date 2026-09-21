@@ -83,7 +83,7 @@ description: >-
 | 场景                                                               | 代码信号 / 关键词                                                                                                 | 读取                                                                                                                                 |
 |------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------|
 | 链式条件更新：有值才更新、动态 set、原子增减                                         | `UpdateChain`、`.set(field, value, If::hasText)`、`.set(field, value, If::notNull)`、`.setRaw()`（如 `age + 1`） | `references/06-updatechain.md`                                                                                                     |
-| PATCH 语义：需要区分"字段未传"和"字段传了 null"三态                                | `OptionalField<T>`、`State.MISSING`/`NULL`/`VALUE`、DTO 中用 `OptionalField` 包装字段                              | 读 `references/12-optional-field.md`；需要理解源码实现或 `OptionalDtoUtil.toUpdateEntity()` 内部逻辑时补读 `references/12a-optional-field-source.md` |
+| PATCH 语义：需要区分"字段未传"和"字段传了 null"三态                                | `OptionalField<T>`、`State.MISSING`/`NULL`/`VALUE`、DTO 中用 `OptionalField` 包装字段                              | 读 `references/12-optional-field.md`（**项目侧自研能力，非框架 API**；框架侧对应 `UpdateEntity`）；需要理解源码实现或 `OptionalDtoUtil.toUpdateEntity()` 内部逻辑时补读 `references/12a-optional-field-source.md` |
 | 按 ID 更新实体部分字段（不用 UpdateChain）                                    | `UpdateEntity.of(Account.class, id)`，然后 `mapper.updateByEntity()`                                          | `references/09-service-mapper.md`（UpdateEntity 章节）                                                                                 |
 | 需要查看 `UpdateChain` / `PropertySetter` / `UpdateWrapper` 的完整方法和用法 | `set`、`setRaw`、`isEffective`、`Predicate<V>`、`BooleanSupplier`                                              | `references/11c-source-api.md`                                                                                                     |
 | 需要查看 `If` 工具类的条件判断方法                                             | `If::notNull`、`If::hasText`、`If::notEmpty`、`If::isEmpty`                                                   | `references/11d-source-api.md`                                                                                                     |
@@ -99,7 +99,7 @@ description: >-
 
 | 场景                                             | 代码信号 / 关键词                                                                                              | 读取                                |
 |------------------------------------------------|---------------------------------------------------------------------------------------------------------|-----------------------------------|
-| 不确定 Service 层怎么写：是否继承 IService、怎么注入 Mapper     | `Service` 类、`BaseMapper`、`mapper.queryChain()`                                                          | `references/09-service-mapper.md` |
+| 不确定 Service 层怎么写：是否继承 IService、怎么注入 Mapper     | `Service` 类、`BaseMapper`、`QueryChain.of(mapper)`                                                          | `references/09-service-mapper.md` |
 | 需要查看 `BaseMapper` 的完整方法列表                      | `selectOneById`、`selectAll`、`selectListByQuery`、`selectListByQueryAs`、`paginate`、`selectCount`、`exists` | `references/09-service-mapper.md` |
 | 需要分页查询：Page 对象、`paginate` 用法、`PageWithDetails` | `paginate`、`Page`、`PageWithDetails`                                                                     | `references/09-service-mapper.md` |
 | 只查询部分字段、字段排除、字段重命名                             | `ALL_COLUMNS.except(...)`、`.as()`、`selectListByQueryAs`                                                 | `references/09-service-mapper.md` |
@@ -116,7 +116,7 @@ description: >-
 | 多数据源、读写分离、动态切换数据源                            | `DataSourceKey`、`@UseDataSource`、`default-datasource-key`、读写分离 `DataSourceShardingStrategy`、解密 `DataSourceDecipher` | `references/07-core-features.md`                                                     |
 | 动态表名（运行时切换表名，如按月分表）                          | `TableManager.setDynamicTableProcessor`                                                    | `references/07-core-features.md`                                                     |
 | SQL 审计、SQL 打印                                | `AuditManager.setAuditEnable`、`ConsoleMessageCollector`、`configuration.log-impl`                                                                               | `references/07-core-features.md`                                                     |
-| 编程式事务（不用 `@Transactional` 注解）                | `TransactionUtil.execute()`、`TransactionUtil.getTemplate()`、`Propagation.REQUIRES_NEW`     | `references/13-transaction-util.md`                                                  |
+| 编程式事务（不用 `@Transactional` 注解）                | `TransactionUtil.execute()`（**项目侧封装，非框架 API**；框架原生为 `Db.tx`）、`TransactionUtil.getTemplate()`、`Propagation.REQUIRES_NEW`     | `references/13-transaction-util.md`                                                  |
 
 ### 九、Spring Boot 配置
 
@@ -149,6 +149,7 @@ UpdateChain.of(Account.class)
 - `setRaw` 只用于数据库表达式、原子增减、函数或受控子查询；禁止拼接未校验用户输入。
 - `Db.executeBatch` 的 consumer 内部 `insert`/`update` 返回值不是影响行数（恒为 `BATCH_UPDATE_RETURN_VALUE` 哨兵值），真实行数在其返回的 `int[]` 中；consumer 必须使用传入的 mapper 参数。详见 [09-service-mapper.md](references/09-service-mapper.md) 批量操作章节。
 - 多数据源切换注解是 `@UseDataSource`（`value` = 数据源 key）；只有 1 个数据源时该注解不生效。详见 [07-core-features.md](references/07-core-features.md) 多数据源章节。
+- 1.11.8 起 `BaseMapper` 不再提供 `queryChain()`（旧版有，已移除）：从 Mapper 拿链式查询用 `QueryChain.of(mapper)`，链式更新用 `UpdateChain.of(mapper)`；`queryChain()`/`updateChain()` 只剩 `IService` 上有，而本项目 Service 不继承 IService。
 
 ## 常用导入
 
@@ -157,7 +158,7 @@ import com.mybatisflex.core.query.If;
 import com.mybatisflex.core.query.QueryWrapper;
 import com.mybatisflex.core.query.QueryChain;
 import com.mybatisflex.core.update.UpdateChain;
-import com.mybatisflex.core.update.UpdateEntity;
+import com.mybatisflex.core.util.UpdateEntity;
 import com.mybatisflex.core.row.Db;
 import com.mybatisflex.core.row.DbChain;
 

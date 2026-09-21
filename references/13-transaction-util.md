@@ -1,5 +1,27 @@
 # TransactionUtil 事务工具类
 
+> 🚫 **非框架 API（项目侧能力）**：`TransactionUtil`（`com.example.mybatisflex.util`）是**项目侧**基于 Spring
+> `TransactionTemplate` 的封装，MyBatis-Flex 1.11.8 源码中不存在该类（检索无结果）。
+> 还需注意区分两套 `Propagation`：本文示例用的是 **Spring** 的
+> `org.springframework.transaction.annotation.Propagation`；MyBatis-Flex 框架自带的传播特性枚举是
+> `com.mybatisflex.core.transaction.Propagation`（`mybatis-flex-core/src/main/java/com/mybatisflex/core/transaction/Propagation.java:21`）。
+>
+> **框架原生编程式事务**（无需引入本工具，Spring 场景同样可用）：
+> - `Db.tx(Supplier<Boolean>)` / `Db.tx(Supplier<Boolean>, Propagation)` —— `mybatis-flex-core/src/main/java/com/mybatisflex/core/row/Db.java:1155`、`Db.java:1162`；返回 `null`/`false` 或抛异常即回滚
+> - `Db.txWithResult(Supplier<T>)` / `Db.txWithResult(Supplier<T>, Propagation)` —— `Db.java:1170`、`Db.java:1177`；仅抛异常才回滚
+> - `Db.txWithDecider(Supplier<T>, RollbackDecider<T>)` —— `Db.java:1184`
+> - 底层实现 `TransactionalManager.exec(Supplier, Propagation, RollbackDecider)` —— `mybatis-flex-core/src/main/java/com/mybatisflex/core/transaction/TransactionalManager.java:60`
+> - 框架 `Propagation` 枚举值：`REQUIRED`/`SUPPORTS`/`MANDATORY`/`REQUIRES_NEW`/`NOT_SUPPORTED`/`NEVER`/`NESTED`；其中 `NESTED` 运行时暂不支持（抛 `TransactionException`，见 `TransactionalManager.java:111`）
+> - Spring 场景也可直接使用 `@Transactional` 或 Spring `TransactionTemplate`（官方文档 `docs/zh/core/tx.md`）
+>
+> ```java
+> // 框架原生编程式事务示例
+> Db.tx(() -> {
+>     orderMapper.insert(order);
+>     return true; // 返回 false/null 或抛异常均回滚
+> });
+> ```
+
 ## 依赖
 
 需要 `spring-tx` 的 `PlatformTransactionManager`。

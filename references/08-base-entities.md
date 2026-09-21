@@ -66,6 +66,16 @@ public class BaseAllEntity extends BaseEntity {
 
 ## UUIDv7 主键生成器
 
+**依赖**（Maven；Gradle 用 `implementation "com.github.f4b6a3:uuid-creator:6.1.1"`）：
+
+```xml
+<dependency>
+    <groupId>com.github.f4b6a3</groupId>
+    <artifactId>uuid-creator</artifactId>
+    <version>6.1.1</version>
+</dependency>
+```
+
 ### 生成器实现
 
 ```java

@@ -1,6 +1,10 @@
 # UpdateChain 链式更新
 
-`UpdateChain` 用于 MyBatis-Flex 链式更新和删除。官网示例中常见写法是：
+`UpdateChain` 用于 MyBatis-Flex 链式更新和删除（入口 `UpdateChain.of(...)` 与
+`update()` / `remove()` 见 mybatis-flex-core/src/main/java/com/mybatisflex/core/update/UpdateChain.java:46-63、131、136；
+`where(Account::getId).eq(1)` 的链式返回值由 QueryWrapperAdapter 保证，
+见 mybatis-flex-core/src/main/java/com/mybatisflex/core/query/QueryWrapperAdapter.java:160）。
+官网示例中常见写法是：
 
 ```java
 UpdateChain.of(Account.class)
@@ -25,11 +29,15 @@ WHERE `id` = ?
 
 ## 条件 set
 
-`UpdateChain` 的 `set` 和 `setRaw` 支持第三个条件参数；当条件为 `false` 时，该字段不参与更新。条件参数支持三种形式：
+`UpdateChain` 的 `set` 和 `setRaw` 支持第三个条件参数；当条件为 `false` 时，该字段不参与更新
+（mybatis-flex-core/src/main/java/com/mybatisflex/core/update/UpdateWrapper.java:50-59、101-106：
+`isEffective` 为 `false` 时不会写入 updates）。条件参数支持三种形式：
 
 - `boolean isEffective`
 - `BooleanSupplier isEffective`
 - `Predicate<V> isEffective`
+
+（重载定义见 mybatis-flex-core/src/main/java/com/mybatisflex/core/update/PropertySetter.java:51、60、71、92、101、112、133、142、153、174、183、194、215、224、235、256、265、276）
 
 ```java
 UpdateChain.of(Account.class)
@@ -78,7 +86,8 @@ UpdateChain.of(Account.class)
 
 ## If 条件速查
 
-`If` 来自 `com.mybatisflex.core.query.If`。
+`If` 来自 `com.mybatisflex.core.query.If`
+（mybatis-flex-core/src/main/java/com/mybatisflex/core/query/If.java）。
 
 | 方法 | 语义 | 适用场景 |
 |------|------|----------|
@@ -101,7 +110,9 @@ UpdateChain.of(KnowledgeDocument.class)
 ## set 与 setRaw
 
 - `set(field, value)` 用参数绑定，适合普通值更新。
-- `setRaw(field, rawSql)` 直接拼接 SQL 片段，适合 `age + 1`、`now()`、数据库函数、子查询等场景。
+- `setRaw(field, rawSql)` 直接拼接 SQL 片段（值被包装为 `RawValue`，不走参数占位符，
+  见 mybatis-flex-core/src/main/java/com/mybatisflex/core/update/UpdateWrapper.java:101-106），
+  适合 `age + 1`、`now()`、数据库函数、子查询等场景。
 - `setRaw` 不接收用户输入直拼；如必须使用，先限制白名单或改用参数化方案。
 
 ```java

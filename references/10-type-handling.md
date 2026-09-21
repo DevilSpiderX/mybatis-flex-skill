@@ -74,7 +74,7 @@ public enum SignFlowStatus {
 - `@JsonValue` - Jackson 注解，序列化时使用 value 字段
 - `@JsonCreator` - Jackson 注解，反序列化时使用静态方法
 
-### 或者直接使用枚举的 name()
+### 无注解枚举（按 name 存取）
 
 ```java
 @Getter
@@ -87,36 +87,22 @@ public enum Status {
 }
 ```
 
-### 基础枚举
+不标 `@EnumValue` 时，实体枚举字段由 `CompositeEnumTypeHandler` 处理：检测到 `@EnumValue`（字段或方法）
+才委托 `FlexEnumTypeHandler`，否则退回 MyBatis 的 `EnumTypeHandler`，按枚举 `name()` 存取
+（`mybatis-flex-core/src/main/java/com/mybatisflex/core/handler/CompositeEnumTypeHandler.java:38-52`，
+注册点 `TableInfo.java:836`）。
 
-```java
-public enum Status {
-    DISABLED(0, "禁用"),
-    ENABLED(1, "启用");
-    
-    private int code;
-    private String desc;
-}
+### 枚举处理器对照
 
-@Column(value = "status", typeHandler = IEnumTypeHandler.class)
-private Status status;
-```
+| 处理器 | 来源 | 说明 |
+|--------|------|------|
+| `CompositeEnumTypeHandler` | MyBatis-Flex | 实体枚举列默认入口，按有无 `@EnumValue` 委托 |
+| `FlexEnumTypeHandler` | MyBatis-Flex | 按 `@EnumValue` 字段/方法取值；读库值匹配不到时返回 `null` |
+| `EnumTypeHandler` | MyBatis | 按枚举 `name()` 存取 |
+| `EnumOrdinalTypeHandler` | MyBatis | 按 ordinal 存取；枚举顺序变动即错位，慎用 |
 
-### 枚举处理器
-
-| 处理器 | 说明 |
-|--------|------|
-| `IEnumTypeHandler` | 按 `IEnum.getCode()` 映射 |
-| `EnumTypeHandler` | 按枚举序号映射（默认） |
-| `EnumOrdinalTypeHandler` | 按 ordinal 映射 |
-
-### 全局配置
-
-```yaml
-mybatis-flex:
-  mapper-impl:
-    enum-as-integer: true
-```
+注意：源码中不存在 `IEnumTypeHandler` / `IEnum`（1.11.8 已移除），也不存在
+`mybatis-flex.mapper-impl.enum-as-integer` 配置项，不要按旧版资料编写。
 
 ## JSON 字段映射
 
@@ -133,29 +119,55 @@ private List<String> tags;
 private YourConfigClass config;
 ```
 
+坑点：`JacksonTypeHandler` 只有 `(Class<?> propertyType)` 和 `(Class<?>, Class<?>)` 两个构造器
+（`mybatis-flex-core/.../handler/JacksonTypeHandler.java:36-43`），由框架按字段类型实例化，**泛型参数丢失**——
+`List<Bean>` 反序列化回来元素是 `Map` 而不是 `Bean`。需要精确泛型时为该字段写专用 handler。
+
 ### 其他 JSON 处理器
 
 ```java
-// Fastjson 处理器
+// Fastjson 处理器（需 com.alibaba:fastjson 依赖）
 @Column(value = "options", typeHandler = FastjsonTypeHandler.class)
 private Map<String, Object> options;
 
-// Fastjson2 处理器
+// Fastjson2 处理器（需 com.alibaba.fastjson2:fastjson2 依赖）
 @Column(value = "options", typeHandler = Fastjson2TypeHandler.class)
 private Map<String, Object> options;
+
+// Gson 处理器（需 com.google.code.gson:gson 依赖）
+@Column(value = "options", typeHandler = GsonTypeHandler.class)
+private Map<String, Object> options;
 ```
+
+注意：Fastjson/Fastjson2/Gson 都是**可选依赖**，不引入对应 jar 时使用其 handler 会类找不到；并非
+"自动检测"。`Fastjson2TypeHandler` 还有个特性：属性类型是接口或抽象类时会写入类型名（`WriteClassName`），
+库中 JSON 会带 `@type` 字段（`Fastjson2TypeHandler.java:39-41,77-82`）。
+
+### 逗号分隔字符串 ↔ List<String>
+
+```java
+@Column(value = "tags", typeHandler = CommaSplitTypeHandler.class)
+private List<String> tags;   // 库中存 "a,b,c"，空串/null 读回来是 null
+```
+
+`CommaSplitTypeHandler` 直接用英文逗号拆分/拼接（`mybatis-flex-core/.../handler/CommaSplitTypeHandler.java:32`），
+元素本身不能含逗号；需要引号包裹等复杂格式时用 JSON handler 代替。
 
 ### 自定义 TypeHandler
 
 ```java
-public class JsonTypeHandler extends AbstractJsonTypeHandler<Object> {
-    private Class<?> type;
-    
+public class MyJsonTypeHandler extends BaseJsonTypeHandler<Object> {
+    private final Class<?> type;
+
+    public MyJsonTypeHandler(Class<?> type) {
+        this.type = type;
+    }
+
     @Override
     protected Object parseJson(String json) {
         return JSON.parseObject(json, type);
     }
-    
+
     @Override
     protected String toJson(Object obj) {
         return JSON.toJSONString(obj);
@@ -163,22 +175,20 @@ public class JsonTypeHandler extends AbstractJsonTypeHandler<Object> {
 }
 ```
 
+基类是 `BaseJsonTypeHandler<T>`（**不是** `AbstractJsonTypeHandler`），已实现 `BaseTypeHandler` 的空串/null
+处理，子类只需实现 `parseJson(String)` / `toJson(T)` 两个抽象方法
+（`mybatis-flex-core/.../handler/BaseJsonTypeHandler.java:27-54`）。构造器带 `Class` 参数才能被
+`@Column(typeHandler = ...)` 按字段类型实例化。
+
 ### JSON 处理器对比
 
 | 处理器 | 依赖 | 说明 |
 |--------|------|------|
-| `JacksonTypeHandler` | Jackson（推荐） | Spring Boot 默认，功能强大 |
-| `FastjsonTypeHandler` | Fastjson | 阿里巴巴 JSON 库 |
-| `Fastjson2TypeHandler` | Fastjson2 | Fastjson 升级版，性能更好 |
-
-### Fastjson / Jackson / Gson
-
-MyBatis-Flex 内置支持：
-- Fastjson：`com.alibaba.fastjson`
-- Jackson：`com.fasterxml.jackson`
-- Gson：`com.google.gson`
-
-无需额外配置，自动检测。
+| `JacksonTypeHandler` | Jackson（推荐） | Spring Boot 常见，功能全 |
+| `FastjsonTypeHandler` | Fastjson（`com.alibaba:fastjson`） | 阿里旧版 |
+| `Fastjson2TypeHandler` | Fastjson2（`com.alibaba.fastjson2:fastjson2`） | 接口/抽象类型写 `@type` |
+| `GsonTypeHandler` | Gson（`com.google.code.gson:gson`） | Google |
+| `CommaSplitTypeHandler` | 无 | 逗号分隔字符串 ↔ `List<String>` |
 
 ## 日期类型
 
@@ -220,47 +230,70 @@ QueryWrapper.create()
 private String content;
 ```
 
-`isLarge = true` 会导致：
-- 不在 `select *` 中返回
-- 需单独查询：`selectById(id, "content")`
+`isLarge = true` 的效果：APT 生成的 TableDef 默认不把该列放入 `DEFAULT_COLUMNS`
+（官方说明见 `docs/zh/core/column.md:140-180`），即一切走 `DEFAULT_COLUMNS` 的查询都不会带出该列。
+需要查它时显式选择列：
+
+```java
+// QueryChain：显式 select 大字段列
+Account account = QueryChain.of(accountMapper)
+    .select(ACCOUNT.CONTENT)
+    .where(ACCOUNT.ID.eq(id))
+    .one();
+
+// QueryWrapper：同上
+accountMapper.selectOneByQuery(QueryWrapper.create()
+    .select(ACCOUNT.CONTENT)
+    .where(ACCOUNT.ID.eq(id)));
+```
+
+注意：文档中不存在 `selectById(id, "content")` 这种 BaseMapper 方法，不要凭印象调用。
 
 ## 数据脱敏
 
+**注意：`@Column` 没有 `mask` 属性，也不能写 `typeHandler = MaskTypeHandler.class`**——`MaskTypeHandler`
+只有接收规则名的构造器 `MaskTypeHandler(String maskType)`，没有无参构造。正确入口是独立注解
+`@ColumnMask`：
+
 ```java
-@Column(value = "phone", typeHandler = MaskTypeHandler.class)
-private String phone;
+@Table("tb_account")
+public class Account {
+    @ColumnMask(Masks.MOBILE)         // 138****5678
+    private String mobile;
 
-@Column(value = "email", typeHandler = MaskTypeHandler.class)
-private String email;
-
-@Column(value = "id_card", typeHandler = MaskTypeHandler.class)
-private String idCard;
+    @ColumnMask(Masks.CHINESE_NAME)   // 张三丰 -> 张**
+    private String userName;
+}
 ```
 
-内置脱敏规则：
-- 手机号：`138****5678`
-- 邮箱：`zh****san@example.com`
-- 身份证：`110***********1234`
+`@ColumnMask` 只支持 String 字段，规则名必须已在 `MaskManager` 注册，否则启动即抛
+`IllegalStateException`；且**只读脱敏、写不脱敏**——编辑回显要用 `MaskManager.execWithoutMask(...)`
+取原始值，否则会把脱敏值保存回库。
+
+完整规则清单（内置 9 种）、自定义规则、与 `SetListener` 的区别见
+[07-core-features.md](07-core-features.md) 脱敏章节。
 
 ## 类型处理器 TypeHandler
 
-### 内置处理器
+### MyBatis-Flex 内置处理器
+
+`mybatis-flex-core/.../handler/` 包下共 8 个类（1.11.8）：
 
 | 处理器 | 用途 |
 |--------|------|
-| `LongTypeHandler` | Long 类型 |
-| `IntegerTypeHandler` | Integer 类型 |
-| `StringTypeHandler` | String 类型 |
-| `BigDecimalTypeHandler` | BigDecimal |
-| `BooleanTypeHandler` | Boolean |
-| `DateTypeHandler` | java.util.Date |
-| `LocalDateTimeTypeHandler` | LocalDateTime |
-| `LocalDateTypeHandler` | LocalDate |
-| `JsonTypeHandler` | JSON 对象 |
-| `IEnumTypeHandler` | 枚举类型 |
-| `FastjsonTypeHandler` | Fastjson |
-| `JacksonTypeHandler` | Jackson |
-| `GsonTypeHandler` | Gson |
+| `JacksonTypeHandler` | Jackson JSON（构造参数为字段类型） |
+| `FastjsonTypeHandler` | Fastjson 1.x JSON（需 fastjson 依赖） |
+| `Fastjson2TypeHandler` | Fastjson2 JSON（需 fastjson2 依赖；接口/抽象类型写 `@type`） |
+| `GsonTypeHandler` | Gson JSON（需 gson 依赖） |
+| `CommaSplitTypeHandler` | 逗号分隔字符串 ↔ `List<String>` |
+| `BaseJsonTypeHandler` | JSON handler 抽象基类，自定义 JSON 处理继承它 |
+| `CompositeEnumTypeHandler` | 实体枚举列默认入口，按有无 `@EnumValue` 委托 |
+| `FlexEnumTypeHandler` | 按 `@EnumValue` 取值 |
+
+常见标量类型（`LongTypeHandler`/`IntegerTypeHandler`/`StringTypeHandler`/`BigDecimalTypeHandler`/
+`BooleanTypeHandler`/`DateTypeHandler`/`LocalDateTimeTypeHandler`/`LocalDateTypeHandler`）是 **MyBatis 自带**
+（`org.apache.ibatis.type` 包），框架自动注册，无需也不应在 `@Column(typeHandler=...)` 里手写。
+旧版资料里的 `JsonTypeHandler`、`IEnumTypeHandler` 在 1.11.8 源码中不存在，不要使用。
 
 ### 自定义处理器
 
@@ -295,26 +328,38 @@ public class EncryptTypeHandler extends BaseTypeHandler<String> {
 ### 注册处理器
 
 ```java
-// 注解方式
+// 字段级：注解方式（最常见）
 @Column(value = "phone", typeHandler = EncryptTypeHandler.class)
 private String phone;
-
-// 全局注册
-mybatis-flex:
-  type-handlers:
-    - com.example.handler.EncryptTypeHandler
 ```
+
+全局注册走**包扫描**，不是类列表（配置类 `MybatisFlexProperties.typeHandlersPackage`，
+`mybatis-flex-spring-boot-starter/.../MybatisFlexProperties.java:104`，支持 `com.example.*.typehandler`
+形式通配符，`mybatis-flex-spring/.../FlexSqlSessionFactoryBean.java:278-289`）：
+
+```yaml
+mybatis-flex:
+  type-handlers-package: com.example.handler
+```
+
+坑点：
+
+- 不存在 `mybatis-flex.type-handlers` 这种类列表写法。
+- 包扫描注册依赖 `@MappedTypes`/`@MappedJdbcTypes` 注解，或从 `BaseTypeHandler<T>` 的泛型推断类型；
+  两种都没有时注册不上。
+- `@Column(typeHandler = ...)` 方式不需要 `@MappedTypes` 等注解，框架按字段类型实例化。
 
 ## TypeHandler 内联写法
 
-在注解中直接使用：
+`@Column(typeHandler` 只接受 `Class<? extends TypeHandler>`，没有字符串全类名的重载，直接写类引用即可：
 
 ```java
-@Column(value = "options", typeHandler = JsonTypeHandler.class)
+@Column(value = "options", typeHandler = JacksonTypeHandler.class)
 private Map<String, Object> options;
 
-// 或更明确
-@Column(value = "options", 
-        typeHandler = "com.alibaba.fastjson2.support.spring6x.web.FastJsonHttpMessageConverter")
-private Map<String, Object> options;
+@Column(value = "tags", typeHandler = CommaSplitTypeHandler.class)
+private List<String> tags;
+
+@Column(value = "password", typeHandler = EncryptTypeHandler.class)
+private String password;
 ```

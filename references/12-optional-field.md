@@ -1,8 +1,15 @@
 # OptionalField 三态值类型
 
-> ⚠️ **前提条件**：使用 `OptionalField` 三态值类型前，必须先确保项目中已引入该类型。源码实现请参考 [12a-optional-field-source.md](12a-optional-field-source.md)。
+> 🚫 **非框架 API（项目侧能力）**：`OptionalField` / `OptionalDtoUtil` **不是 MyBatis-Flex 框架能力**。
+> 以源码基线 **MyBatis-Flex 1.11.8** 检索 `OptionalField`、`OptionalDtoUtil`、`State.MISSING` 均无任何结果
+> （包名 `com.example.json.lang` / `com.example.mybatisflex.util` 亦不存在）。本文档与
+> [12a-optional-field-source.md](12a-optional-field-source.md) 中的代码是**项目侧自研工具**，使用前需先将源码引入自己的项目。
+> 框架侧与"部分更新 / 显式置 null"对应的能力是 `UpdateEntity`
+> （`com.mybatisflex.core.util.UpdateEntity.of(clazz)` / `UpdateEntity.of(clazz, id)`，
+> 见 `mybatis-flex-core/src/main/java/com/mybatisflex/core/util/UpdateEntity.java:34`、`:40`），
+> 另见 [09-service-mapper.md](09-service-mapper.md) UpdateEntity 章节。
 
-> OptionalField 是一个自定义的三态值类型，用于处理部分更新场景。它表示字段的三种状态：有值、null、不存在。
+> OptionalField 是一个项目侧自定义的三态值类型，用于处理部分更新场景。它表示字段的三种状态：有值、null、不存在。
 
 ## 核心概念
 
@@ -71,7 +78,9 @@
 | `isNull()` | 是否为 NULL 状态 | `boolean` |
 | `isMissing()` | 是否为 MISSING 状态 | `boolean` |
 | `isEmpty()` | 是否为空（NULL 或 MISSING） | `boolean` |
-| `getState()` | 获取当前状态枚举 | `State` |
+
+> 注意：[12a-optional-field-source.md](12a-optional-field-source.md) 的参考实现中**没有** `State` 枚举，
+> 也没有 `getState()` 方法；判断状态请使用 `isPresent()` / `isNull()` / `isMissing()`。
 
 ### 获取值
 

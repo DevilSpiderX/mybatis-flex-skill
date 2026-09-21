@@ -22,8 +22,8 @@ It should not activate for plain MyBatis, MyBatis-Plus, JPA, or other ORM persis
 ### Chain Operations First
 
 ```java
-// QueryChain
-List<Account> accounts = accountMapper.queryChain()
+// QueryChain (BaseMapper has no queryChain() method; at mapper level use QueryChain.of(mapper))
+List<Account> accounts = QueryChain.of(accountMapper)
     .where(ACCOUNT.AGE.ge(18))
     .and(ACCOUNT.USER_NAME.like("michael"))
     .list();
@@ -40,6 +40,7 @@ UpdateChain.of(Account.class)
 ```java
 @Table("tb_account")
 public class Account extends BaseEntity {
+    // Project-side UUIDv7 key generator (implementation & registration: 08-base-entities.md)
     @Id(keyType = KeyType.Generator, value = UUIDv7KeyGenerator.NAME)
     private String id;
     private String userName;
@@ -50,6 +51,8 @@ public class Account extends BaseEntity {
 APT automatically generates TableDef classes for type-safe queries.
 
 > 💡 **Recommended**: Enable APT auto-generation of Mapper interfaces. Configure `processor.mapper.generateEnable=true` and `processor.mapper.annotation=true` in `mybatis-flex.config`.
+
+> ⚠️ **Key generator recommendation**: standardize on the project-side `UUIDv7KeyGenerator` from 08-base-entities.md (time-ordered, `char(32)` column; implement `IKeyGenerator` and register via `KeyGeneratorFactory.register(...)`). MyBatis-Flex 1.11.8 ships only `uuid` / `flexId` / `snowFlakeId` / `ulid` (`com.mybatisflex.core.keygen.KeyGenerators`) and has **no** UUIDv7 — do **not** use the built-in `KeyGenerators` constants directly; `BaseEntity` in the example is project-side code as well.
 
 ### APT Code Generation (Recommended)
 
@@ -83,7 +86,7 @@ processor.tableDef.package=${entityPackage}.table
 
 ### Service Layer Best Practices
 
-> ⚠️ **Important Limitation**: ServiceImpl **cannot** extend IService. Inject Mapper directly.
+> ⚠️ **This skill's recommendation**: by default the Service layer **does not extend** the framework's IService/ServiceImpl; inject the Mapper directly (the framework does provide IService/ServiceImpl — whether to extend them is a project-style decision, not a framework restriction).
 
 Inject Mapper directly without extending IService:
 
@@ -99,9 +102,9 @@ public class AccountService {
 }
 ```
 
-### OptionalField Ternary Value Type (Optional Feature)
+### OptionalField Ternary Value Type (Project-side Capability, NOT a Framework API)
 
-> OptionalField is a custom ternary value type for handling partial update scenarios (e.g., PATCH requests).
+> ⚠️ OptionalField is a **project-side custom** ternary value type (it does not exist in MyBatis-Flex 1.11.8), for handling partial update scenarios (e.g., PATCH requests). The framework-side counterpart is `UpdateEntity` (`com.mybatisflex.core.util.UpdateEntity.of(...)`).
 
 | State | Meaning | UpdateEntity Behavior |
 |-------|---------|----------------------|
@@ -149,9 +152,9 @@ See the `references/` directory for details:
 | [11b-source-api.md](references/11b-source-api.md) | QueryWrapper / QueryWrapperAdapter / chained query source analysis |
 | [11c-source-api.md](references/11c-source-api.md) | PropertySetter / UpdateWrapper / UpdateChain source analysis |
 | [11d-source-api.md](references/11d-source-api.md) | If conditional utility class |
-| [12-optional-field.md](references/12-optional-field.md) | OptionalField tri-state type (partial update scenarios) |
-| [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField source code implementation |
-| [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil transaction utility class (simplified programmatic transaction management) |
+| [12-optional-field.md](references/12-optional-field.md) | OptionalField tri-state type (**project-side capability, not a framework API**) |
+| [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField source code implementation (**project-side code, not framework source**) |
+| [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil transaction utility (**project-side capability**; the framework-native programmatic API is `Db.tx`) |
 
 ## 📋 Common Imports
 
@@ -161,8 +164,12 @@ import com.mybatisflex.core.query.QueryChain;
 import com.mybatisflex.core.update.UpdateChain;
 import com.mybatisflex.core.row.Db;
 import com.mybatisflex.core.row.DbChain;
+import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
+
+// Project-side UUIDv7 key generator (see 08-base-entities.md)
+import com.example.mybatisflex.keygen.UUIDv7KeyGenerator;
 
 // APT-generated TableDef
 import static com.example.common.entity.table.AccountTableDef.ACCOUNT;
@@ -176,7 +183,7 @@ import com.mybatisflex.core.query.QueryMethods;
 ### Requirements
 
 - Java 17+
-- MyBatis-Flex 1.9+
+- MyBatis-Flex 1.11.8 (API verification baseline for this documentation)
 - Spring Boot 3.x
 
 ### Installation
@@ -261,7 +268,7 @@ mybatis-flex-skill/
 ├── SKILL.md
 ├── .claude-plugin/plugin.json      # Claude plugin manifest (optional, active when the dir is installed)
 ├── hooks/
-│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit/PreCompact/PostCompact/PostToolUse hook
+│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit/PreCompact/PostCompact/PostToolUse/PostToolUseFailure hook
 │   ├── hooks.codex.json            # Codex hook config (built to dist/codex-plugin/hooks/hooks.json)
 │   └── session_activation.py       # Bounded evidence detection + activation context injection
 ├── .codex-plugin/plugin.json       # Codex plugin manifest (optional)
@@ -305,7 +312,7 @@ In plugin form (Claude Code / Codex), the `SessionStart` / `UserPromptSubmit` ho
 
 | Goal | Implementation |
 |------|----------------|
-| Reliable triggering | `SessionStart` covers all session starts: `startup`/`resume`/`clear`/`compact`/`fork`; behavior is identical across CLI, desktop app, IDE extensions, and SSH remote sessions (officially, hook events fire the same wherever Claude Code runs) |
+| Reliable triggering | `SessionStart` covers all session starts: `startup`/`resume`/`clear`/`compact` (see the matcher in `hooks/hooks.json`); behavior is identical across CLI, desktop app, IDE extensions, and SSH remote sessions (officially, hook events fire the same wherever Claude Code runs) |
 | Zero noise | Injects the activation context only when MyBatis-Flex evidence is found (`com.mybatisflex` dependency, `mybatis-flex.config`, `com.mybatisflex` imports, `mybatis-flex:` in `application.yml`); zero output and zero token cost on a miss |
 | Fast return | Bounded detection: reads only the first 256 KiB of candidate build files, scans at most 256 source files at up to 8 levels deep; typically <10ms, hook timeout 5s |
 | Dedup | Injected once per session; re-detected and refreshed after `resume`/`clear`/`compact` so restored sessions keep the context |
@@ -338,19 +345,22 @@ accountMapper.deleteById("xxx");
 ### Paginated Query
 
 ```java
-Page<Account> page = accountMapper.queryChain()
+Page<Account> page = QueryChain.of(accountMapper)
     .where(ACCOUNT.AGE.ge(18))
-    .page(1, 10);
+    .page(new Page<>(1, 10));  // QueryChain only has page(Page) — no page(int, int) overload
 ```
 
 ### Transaction Management
 
 ```java
-TransactionUtil.execute(transactionManager, status -> {
+// Framework-native programmatic transaction: rollback on false/null or exception
+Db.tx(() -> {
     orderMapper.insert(order);
-    return null;
+    return true;
 });
 ```
+
+> For the project-side `TransactionUtil` wrapper over Spring `TransactionTemplate`, see [13-transaction-util.md](references/13-transaction-util.md) (project-side utility, not a framework API).
 
 ## 🤝 Contributing
 

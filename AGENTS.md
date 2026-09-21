@@ -14,6 +14,11 @@
 
 MyBatis-Plus（`com.baomidou`）、原生 MyBatis、JPA 项目不适用本技能。
 
+> 说明：插件形态下 `SessionStart` / `UserPromptSubmit` hook（`hooks/session_activation.py`）的**自动检测**只覆盖
+> 构建文件与源码中的关键词证据（`com.mybatisflex` 依赖、`mybatis-flex.config`、`com.mybatisflex` 导入、
+> `application.yml` 中 `mybatis-flex:` 配置）；`TableDef` / `QueryChain` 等类名信号供人工或按 `SKILL.md`
+> 判断使用，hook 不做类名检索。
+
 ## 使用方式
 
 按 `SKILL.md` 的"快速路由"表，按任务场景读取 `references/` 下对应文档；不要一次性加载全部参考文件。

@@ -32,8 +32,8 @@
 ### 优先使用链式操作
 
 ```java
-// QueryChain 查询
-List<Account> accounts = accountMapper.queryChain()
+// QueryChain 查询（BaseMapper 没有 queryChain() 方法，Mapper 层用 QueryChain.of(mapper)）
+List<Account> accounts = QueryChain.of(accountMapper)
     .where(ACCOUNT.AGE.ge(18))
     .and(ACCOUNT.USER_NAME.like("michael"))
     .list();
@@ -57,6 +57,7 @@ UpdateChain.of(Account.class)
 ```java
 @Table("tb_account")
 public class Account extends BaseEntity {
+    // 项目侧 UUIDv7 生成器（实现与注册见 08-base-entities.md）
     @Id(keyType = KeyType.Generator, value = UUIDv7KeyGenerator.NAME)
     private String id;
     private String userName;
@@ -68,9 +69,11 @@ APT 自动生成 TableDef 类，用于类型安全查询。
 
 > APT 处理器坐标使用 `com.mybatis-flex:mybatis-flex-processor`，并优先配置到 Maven `annotationProcessorPaths` 或 Gradle `annotationProcessor`，不要提交生成目录。
 
+> ⚠️ **主键生成器推荐**：统一使用 08 文档的项目侧 `UUIDv7KeyGenerator`（时间有序、库列 `char(32)`，需实现 `IKeyGenerator` 并经 `KeyGeneratorFactory.register(...)` 注册）。框架 1.11.8 内置生成器只有 `uuid` / `flexId` / `snowFlakeId` / `ulid`（`com.mybatisflex.core.keygen.KeyGenerators`），没有 UUIDv7，**不建议**直接使用内置 `KeyGenerators` 常量类；示例中的 `BaseEntity` 同为项目侧自研。
+
 ### Service 层最佳实践
 
-> ⚠️ **重要限制**：ServiceImpl **不能**继承 IService，直接注入 Mapper 使用。
+> ⚠️ **本技能建议**：Service 层**默认不继承**框架的 IService/ServiceImpl，直接注入 Mapper 使用（框架本身提供 IService/ServiceImpl；是否继承按项目既有风格决定，非框架限制）。
 
 直接注入 Mapper 使用，不继承 IService：
 
@@ -86,9 +89,9 @@ public class AccountService {
 }
 ```
 
-### OptionalField 三态值类型（可选功能）
+### OptionalField 三态值类型（项目侧能力，非框架 API）
 
-> OptionalField 是自定义的三态值类型，用于处理部分更新场景（如 PATCH 请求）。
+> ⚠️ OptionalField 是**项目侧自研**的三态值类型（MyBatis-Flex 1.11.8 中不存在该类型），用于处理部分更新场景（如 PATCH 请求）。框架侧对应能力是 `UpdateEntity`（`com.mybatisflex.core.util.UpdateEntity.of(...)`）。
 
 | 状态 | 含义 | UpdateEntity 行为 |
 |------|------|-------------------|
@@ -136,9 +139,9 @@ public void updateUser(String userId, UserUpdateDTO dto) {
 | [11b-source-api.md](references/11b-source-api.md) | QueryWrapper / QueryWrapperAdapter / 链式查询源码解析 |
 | [11c-source-api.md](references/11c-source-api.md) | PropertySetter / UpdateWrapper / UpdateChain 源码解析 |
 | [11d-source-api.md](references/11d-source-api.md) | If 条件判断工具类 |
-| [12-optional-field.md](references/12-optional-field.md) | OptionalField 三态值类型（部分更新场景） |
-| [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField 源码实现 |
-| [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil 事务工具类（简化编程式事务管理） |
+| [12-optional-field.md](references/12-optional-field.md) | OptionalField 三态值类型（**项目侧能力，非框架 API**） |
+| [12a-optional-field-source.md](references/12a-optional-field-source.md) | OptionalField 源码实现（**项目侧代码，非框架源码**） |
+| [13-transaction-util.md](references/13-transaction-util.md) | TransactionUtil 事务工具类（**项目侧能力**；框架原生编程式事务为 `Db.tx`） |
 
 ## 📋 常用导入
 
@@ -149,8 +152,12 @@ import com.mybatisflex.core.query.QueryChain;
 import com.mybatisflex.core.update.UpdateChain;
 import com.mybatisflex.core.row.Db;
 import com.mybatisflex.core.row.DbChain;
+import com.mybatisflex.core.paginate.Page;
 import com.mybatisflex.annotation.Id;
 import com.mybatisflex.annotation.KeyType;
+
+// 项目侧 UUIDv7 主键生成器（见 08-base-entities.md）
+import com.example.mybatisflex.keygen.UUIDv7KeyGenerator;
 
 // APT 生成的 TableDef
 import static com.example.common.entity.table.AccountTableDef.ACCOUNT;
@@ -164,7 +171,7 @@ import com.mybatisflex.core.query.QueryMethods;
 ### 配置要求
 
 - Java 17+
-- MyBatis-Flex 1.9+
+- MyBatis-Flex 1.11.8（本文档 API 校验基线）
 - Spring Boot 3.x
 
 ### 安装方式
@@ -249,7 +256,7 @@ mybatis-flex-skill/
 ├── SKILL.md
 ├── .claude-plugin/plugin.json      # Claude 插件清单（可选，随目录安装即生效）
 ├── hooks/
-│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit/PreCompact/PostCompact/PostToolUse hook
+│   ├── hooks.json                  # Claude SessionStart/UserPromptSubmit/PreCompact/PostCompact/PostToolUse/PostToolUseFailure hook
 │   ├── hooks.codex.json            # Codex hook 配置（构建后进入 dist/codex-plugin/hooks/hooks.json）
 │   └── session_activation.py       # 有界证据检测 + 激活上下文注入
 ├── .codex-plugin/plugin.json       # Codex 插件清单（可选）
@@ -293,7 +300,7 @@ processor.tableDef.package=${entityPackage}.table
 
 | 目标 | 实现 |
 |------|------|
-| 稳定触发 | `SessionStart` 覆盖 `startup`/`resume`/`clear`/`compact`/`fork` 全部会话启动方式；CLI、桌面端、IDE 扩展、SSH 远程会话行为一致（官方声明 hooks 事件在所有运行环境相同） |
+| 稳定触发 | `SessionStart` 覆盖 `startup`/`resume`/`clear`/`compact` 全部会话启动方式（见 `hooks/hooks.json` matcher）；CLI、桌面端、IDE 扩展、SSH 远程会话行为一致（官方声明 hooks 事件在所有运行环境相同） |
 | 零噪音 | 仅当检测到 MyBatis-Flex 证据（`com.mybatisflex` 依赖、`mybatis-flex.config`、`com.mybatisflex` 导入、`application.yml` 中 `mybatis-flex:` 配置）才注入激活上下文；未命中零输出，不消耗 token |
 | 快速返回 | 有界检测：只读取候选构建文件前 256 KiB、源码扫描限制 256 个文件与 8 层深度；典型耗时 <10ms，hook 超时 5s |
 | 去重 | 同一会话只注入一次；`resume`/`clear`/`compact` 后重新检测刷新，保证恢复会话后上下文不丢失 |
@@ -325,19 +332,22 @@ accountMapper.deleteById("xxx");
 ### 分页查询
 
 ```java
-Page<Account> page = accountMapper.queryChain()
+Page<Account> page = QueryChain.of(accountMapper)
     .where(ACCOUNT.AGE.ge(18))
-    .page(1, 10);
+    .page(new Page<>(1, 10));  // QueryChain 只有 page(Page) 重载，无 page(int, int)
 ```
 
 ### 事务管理
 
 ```java
-TransactionUtil.execute(transactionManager, status -> {
+// 框架原生编程式事务：返回 false/null 或抛异常即回滚
+Db.tx(() -> {
     orderMapper.insert(order);
-    return null;
+    return true;
 });
 ```
+
+> 项目侧 Spring `TransactionTemplate` 封装 `TransactionUtil` 见 [13-transaction-util.md](references/13-transaction-util.md)（项目侧工具，非框架 API）。
 
 ## 🤝 贡献
 
