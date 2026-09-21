@@ -81,7 +81,7 @@ accountMapper.insertBatch(accounts);
 accountMapper.insertBatchSelective(accounts);
 ```
 
-大批量 SQL 或非实体场景可评估 `Db.executeBatch`。批量更新前必须确认数据量、事务边界和失败回滚策略。
+大批量 SQL 或非实体场景可评估 `Db.executeBatch`。批量更新前必须确认数据量、事务边界和失败回滚策略。注意其 consumer 内部 insert/update 的返回值不是影响行数（恒为 `BATCH_UPDATE_RETURN_VALUE`），真实行数在 `Db.executeBatch` 返回的 `int[]` 中，详见 `references/09-service-mapper.md` 批量操作章节。
 
 ## Db + Row
 

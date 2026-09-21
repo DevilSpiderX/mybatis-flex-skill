@@ -170,6 +170,35 @@ Db.executeBatch(sql, 1000, (preparer, entity) -> {
 });
 ```
 
+**坑点：consumer 内部的 insert/update 返回值不是影响行数。** `Db.executeBatch` 内部以
+`ExecutorType.BATCH` 打开独立 SqlSession，语句先入批、由 `flushStatements()` 统一执行
+（`mybatis-flex-core/src/main/java/com/mybatisflex/core/row/RowMapperInvoker.java:97-126`）；
+`FlexBatchExecutor.doUpdate` 直接返回常量 `BATCH_UPDATE_RETURN_VALUE`（`Integer.MIN_VALUE + 1002`，
+`mybatis-flex-core/src/main/java/com/mybatisflex/core/mybatis/executor/FlexBatchExecutor.java:82`，
+常量定义见 MyBatis `BatchExecutor.java:43`）。真实影响行数在 `Db.executeBatch` 的返回值 `int[]` 中：
+长度与入参集合一致、按顺序逐条对应（`RowMapperInvoker.java:111,121`）；需要总数时自行求和
+（`Db.updateEntitiesBatch` 内部就是 `Arrays.stream(...).sum()`，`mybatis-flex-core/src/main/java/com/mybatisflex/core/row/Db.java:460`）。
+
+```java
+// 正确：影响行数取 Db.executeBatch 的返回值
+int[] rows = Db.executeBatch(entities, 1000, AccountMapper.class, (mapper, entity) -> mapper.insert(entity));
+long total = Arrays.stream(rows).sum();
+
+// 错误：把 consumer 内部 insert 的返回值当影响行数
+Db.executeBatch(entities, 1000, AccountMapper.class, (mapper, entity) -> {
+    int affected = mapper.insert(entity);   // 恒为 BATCH_UPDATE_RETURN_VALUE，与行数无关
+});
+```
+
+其他注意：
+
+- consumer 必须使用参数传入的 `mapper`（来自 BATCH session，`RowMapperInvoker.java:100`）；若改用容器注入的
+  Mapper Bean，语句经默认 executor 立即执行，失去批处理意义。
+- 每条数据只应触发一条语句：`results` 数组按 `datas.size()` 预分配，一个 `consumer.accept` 里执行多条语句时
+  updateCounts 总数越界，回填会数组越界。
+- 批量执行失败抛 `BatchExecutorException`（`FlexBatchExecutor.java:120-132`），已入批的子批次随事务回滚，
+  需按项目错误响应策略处理。
+
 ## 分页查询
 
 ```java

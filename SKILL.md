@@ -55,7 +55,7 @@ description: >-
 |--------------------------------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------------|
 | 配置实体类注解：表名、主键策略、列映射、字段忽略、大字段                     | `@Table`、`@Id`、`@Column`、`@ColumnAlias`、`KeyType`、`isLarge`                                                     | `references/02-annotations.md`   |
 | 定义实体间关联关系（一对一、一对多、多对多）                           | `@RelationOneToOne`、`@RelationOneToMany`、`@RelationManyToOne`、`@RelationManyToMany`                             | `references/02-annotations.md`   |
-| 字段类型映射问题：枚举存库、JSON 列、日期格式、脱敏、大字段、自定义 TypeHandler | `@Column(typeHandler=...)`、`@EnumValue`、`JacksonTypeHandler`、`Fastjson2TypeHandler`、`MaskTypeHandler`、`isLarge` | `references/10-type-handling.md` |
+| 字段类型映射问题：枚举存库、JSON 列、日期格式、脱敏、大字段、自定义 TypeHandler | `@Column(typeHandler=...)`、`@EnumValue`、`JacksonTypeHandler`、`Fastjson2TypeHandler`、`@ColumnMask`、`Masks.*`、`isLarge` | `references/10-type-handling.md`，脱敏规则与开关见 `references/07-core-features.md`（脱敏章节） |
 
 ### 三、查询
 
@@ -108,14 +108,14 @@ description: >-
 
 | 场景                                           | 代码信号 / 关键词                                                                                 | 读取                                                                                   |
 |----------------------------------------------|--------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------|
-| 乐观锁（版本号控制）                                   | `@Column(version = true)`、`@Version`                                                       | `references/07-core-features.md`                                                     |
+| 乐观锁（版本号控制）                                   | `@Column(version = true)`                                                       | `references/07-core-features.md`                                                     |
 | 多租户隔离                                        | `@Column(tenantId = true)`、`TenantManager`、`tenant_id` 字段                                  | `references/07-core-features.md`                                                     |
-| 数据权限（行级权限过滤）                                 | `DataPermission`、行级过滤                                                                      | `references/07-core-features.md`                                                     |
-| 字段加密/脱敏                                      | `SetListener`、`@Table(onSet)`、字段加解密                                                        | `references/07-core-features.md`                                                     |
+| 数据权限（行级权限过滤）                                 | `IDialect.prepareAuth`、自定义方言、行级过滤                                                                      | `references/07-core-features.md`                                                     |
+| 字段加密/脱敏                                      | `SetListener`、`@Table(onSet)`、`@ColumnMask`、`Masks.*`、字段加解密                                                | `references/07-core-features.md`                                                     |
 | 数据填充：自动写入 createTime/updateTime/createUser 等 | `@OnInsert`、`@OnUpdate`、`@Table(onInsert/onUpdate)`、`@Column(onInsertValue/onUpdateValue)` | `references/07-core-features.md`（填充章节），如需项目级统一配置则补读 `references/08-base-entities.md` |
-| 多数据源、读写分离、动态切换数据源                            | `DataSourceKey`、`@DS`、数据源 YAML 配置                                                          | `references/07-core-features.md`                                                     |
+| 多数据源、读写分离、动态切换数据源                            | `DataSourceKey`、`@UseDataSource`、`default-datasource-key`、读写分离 `DataSourceShardingStrategy`、解密 `DataSourceDecipher` | `references/07-core-features.md`                                                     |
 | 动态表名（运行时切换表名，如按月分表）                          | `TableManager.setDynamicTableProcessor`                                                    | `references/07-core-features.md`                                                     |
-| SQL 审计、SQL 打印                                | SQL 日志、审计拦截器                                                                               | `references/07-core-features.md`                                                     |
+| SQL 审计、SQL 打印                                | `AuditManager.setAuditEnable`、`ConsoleMessageCollector`、`configuration.log-impl`                                                                               | `references/07-core-features.md`                                                     |
 | 编程式事务（不用 `@Transactional` 注解）                | `TransactionUtil.execute()`、`TransactionUtil.getTemplate()`、`Propagation.REQUIRES_NEW`     | `references/13-transaction-util.md`                                                  |
 
 ### 九、Spring Boot 配置
@@ -147,6 +147,8 @@ UpdateChain.of(Account.class)
   适合集合、数组、Map；`If::noText` 是“为空时才生效”，不是“有值才更新”。参考来源见 [11d-source-api.md](references/11d-source-api.md)。
 - 需要显式更新为 `null` 时，不要用普通 null 判空跳过；使用 `UpdateEntity` 或 `OptionalField` 区分“未传字段”和“传了 null”。
 - `setRaw` 只用于数据库表达式、原子增减、函数或受控子查询；禁止拼接未校验用户输入。
+- `Db.executeBatch` 的 consumer 内部 `insert`/`update` 返回值不是影响行数（恒为 `BATCH_UPDATE_RETURN_VALUE` 哨兵值），真实行数在其返回的 `int[]` 中；consumer 必须使用传入的 mapper 参数。详见 [09-service-mapper.md](references/09-service-mapper.md) 批量操作章节。
+- 多数据源切换注解是 `@UseDataSource`（`value` = 数据源 key）；只有 1 个数据源时该注解不生效。详见 [07-core-features.md](references/07-core-features.md) 多数据源章节。
 
 ## 常用导入
 
