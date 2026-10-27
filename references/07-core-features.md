@@ -51,9 +51,45 @@ UPDATE `tb_account` SET `is_delete` = 1 WHERE `id` = ? AND `is_delete` = 0
 
 查询时 `TableInfo.appendConditions` 自动附加 `is_delete = 0`（`mybatis-flex-core/src/main/java/com/mybatisflex/core/table/TableInfo.java:1033-1045`），`selectOneBy**/selectListBy**/selectCountBy**/paginate` 及 left join 的子表均会附加。insert 时逻辑删除字段为 null 会自动初始化为正常值（`TableInfo.java:1561-1577`）。
 
+**自动附加覆盖范围（1.11.8 源码 + 实测核实）**：
+
+| 场景 | 自动附加 | 说明 / 源码位置 |
+|---|---|---|
+| 主表（单 `from`） | ✅ | `TableInfo.appendConditions`（`TableInfo.java:993-1101`） |
+| join 子表 | ✅ | 条件并入 ON：join 表构造独立 wrapper、`appendConditions` 后写回 `CPI.setJoinQueryCondition`（`TableInfo.java:1074-1089`，条件构建 `logicdelete/AbstractLogicDeleteProcessor.java:42-47`） |
+| where/having 子查询（含 EXISTS/NOT EXISTS） | ✅ | 递归收集：`QueryWrapper.getChildSelect`（`QueryWrapper.java:2636-2664`）+ `WrapperUtil.getChildQueryWrapper`（`WrapperUtil.java:39-83`） |
+| CTE（`with`/`withRecursive` + `asSelect`）内部 | ❌ | `appendConditions` 的递归遍历不含 `With` 结构；CTE 查询体只在渲染期输出（`CPI.getWith`（`query/CPI.java:58`）全仓库唯一消费者是 `CommonsDialectImpl.java:444`） |
+| 多表逗号 FROM（`from(a, b)`）第 2 张及以后 | ❌ | `APPEND_CONDITIONS_FLAG` 置于 wrapper context，同一 wrapper 第二次进入直接 return（`TableInfo.java:991-1000`）；`EntitySqlProvider.appendTableConditions`（`provider/EntitySqlProvider.java:382-400`）同构 |
+
+**何时必须手写 `deleted = 0`（租户条件同理）**：
+
+1. **CTE 内部**：`with`/`withRecursive` + `asSelect` 的查询体不会被 `appendConditions` 遍历——锚定段、递归段（含 `unionAll` 各分支）里每张带逻辑删除/租户列的表都要手写条件（典型：树形递归查询 `getSuperiorChainById`，`withRecursive` + `asSelect` + `unionAll` + 表别名）。
+2. **多表逗号 FROM**：`from(a, b)` 只有第一个表自动附加，第二张及以后手写。单 `from` + join 不受影响（join 走独立 wrapper 并入 ON）。
+
+其余场景（主表、join 并入 ON、where/having 子查询含 EXISTS）**自动附加**；这些场景手写属于重复条件（无害但非必需）。
+
+```java
+// 示意：tb_article 带逻辑删除列 is_delete
+QueryWrapper cteBody = QueryWrapper.create()
+    .select().from(ARTICLE)
+    .where(ARTICLE.ID.ge(100)
+        .and(ARTICLE.IS_DELETE.eq(0)))       // 手写：CTE 锚定段不自动附加
+    .unionAll(
+        QueryWrapper.create().select().from(ARTICLE)
+            .where(ARTICLE.IS_DELETE.eq(0))  // 手写：unionAll 每个分支同样要写
+    );
+
+QueryWrapper query = new QueryWrapper()
+    .withRecursive("CTE").asSelect(cteBody)
+    .select().from(ACCOUNT)
+    .where(ACCOUNT.SEX.eq(1));               // 主表自动附加 is_delete = 0
+```
+
 坑点：
 
 - 处理器是 JVM 级静态单例，多张表无法分别配置不同类型。
+- CTE（`with`/`withRecursive` + `asSelect`）内部与多表逗号 FROM 的第 2 张及以后表**不**自动附加逻辑删除/租户条件，必须手写（见上文覆盖范围表）。
+- 验证自动条件不要用 `QueryWrapper.toSQL()`——它不含 `appendConditions` 追加的条件（见 `11b-source-api.md` toSQL 说明）。
 - `DateTimeLogicDeleteProcessor` 删除值是字符串 `"NOW()"` 直拼，换 Oracle 等无 `now()` 的库必须自定义处理器。
 - 自定义字符串值（如 `"Y"/"N"`）走字符串拼接进 SQL，注意注入风险。
 - 已逻辑删除的数据更新不到（update 的 WHERE 同样带 `is_delete = 0`，`CommonsDialectImpl.java:885-889`）。

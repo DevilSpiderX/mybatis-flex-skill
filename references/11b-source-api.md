@@ -80,7 +80,13 @@ QueryWrapper.create(map)
 | `forUpdate()` | FOR UPDATE 锁 |
 | `datasource(key)` | 指定数据源 |
 | `hint(sql)` | SQL 提示 |
-| `toSQL()` | 调试：查看生成的 SQL |
+| `toSQL()` | 调试：查看生成的 SQL（⚠️ 不含自动条件，见下） |
+
+> **⚠️ `toSQL()` 陷阱（1.11.8，设计行为，非 bug）**：`toSQL()` = `DialectFactory.getDialect().forSelectByQuery(this)`
+> （`QueryWrapper.java:2666-2669`），不经过 `EntitySqlProvider.appendTableConditions`（真实执行路径
+> `EntitySqlProvider.java:367-379`：L370 先追加逻辑删除/租户/乐观锁条件，L373 才生成 SQL）。因此 `toSQL()`
+> 输出**不含逻辑删除/租户/乐观锁自动条件**。测试**禁止用 `toSQL()` 断言 `deleted = 0`**——断言到的只会是手写
+> 条件；要验证自动条件请走真实执行路径（Mapper/Db 查询）或看 SQL 日志。
 
 ---
 

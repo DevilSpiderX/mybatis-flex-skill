@@ -454,6 +454,27 @@ QueryWrapper query = new QueryWrapper()
 //      SELECT * FROM tb_account WHERE sex = 1
 ```
 
+### CTE 内的逻辑删除/租户条件（必须手写）
+
+`TableInfo.appendConditions` 的自动条件追加**不遍历 `With` 结构**（1.11.8）：CTE 查询体只在 SQL 渲染期输出
+（`CPI.getWith` 仅被 `CommonsDialectImpl.java:444` 消费），条件追加阶段访问不到。因此 `with`/`withRecursive`
++ `asSelect` 的查询体——锚定段、递归段、`unionAll` 各分支——里每张带逻辑删除/租户列的表都要手写条件
+（如 `deleted = 0`）；主查询侧的表仍自动附加。子查询（where/having/EXISTS）与 join 不受此影响，会自动附加。
+
+```java
+// 示意：tb_article 带逻辑删除列 is_delete
+QueryWrapper query = new QueryWrapper()
+    .withRecursive("CTE").asSelect(
+        QueryWrapper.create().select().from(ARTICLE)
+            .where(ARTICLE.ID.ge(100)
+                .and(ARTICLE.IS_DELETE.eq(0)))   // 手写：CTE 内不自动附加逻辑删除条件
+    )
+    .select().from(ACCOUNT)
+    .where(ACCOUNT.SEX.eq(1));                   // 主表自动附加 is_delete = 0
+```
+
+完整覆盖范围与源码位置见 `references/07-core-features.md` 逻辑删除章节。
+
 ## or/and 嵌套条件组合
 
 ### 基础嵌套
@@ -525,6 +546,11 @@ QueryWrapper qw2 = QueryWrapper.create().select().from(ACCOUNT)
 注意 `toSQL()` 会把参数值替换进 SQL（`SqlUtil.replaceSqlParams`，
 mybatis-flex-core/src/main/java/com/mybatisflex/core/util/SqlUtil.java:121），
 字符串参数会带上单引号。
+
+⚠️ **陷阱（设计行为，非 bug）**：`toSQL()` 直接走 `DialectFactory.getDialect().forSelectByQuery(this)`
+（`QueryWrapper.java:2666-2669`），**不经过** `EntitySqlProvider.appendTableConditions`，输出**不含**逻辑删除/
+租户/乐观锁自动条件。测试**禁止用 `toSQL()` 断言 `deleted = 0`**（断言到的只会是手写条件）；验证自动条件请走
+真实执行路径（Mapper/Db 查询）或看 SQL 日志。详见 `references/11b-source-api.md` toSQL 说明。
 
 ```java
 QueryWrapper query = QueryWrapper.create()
