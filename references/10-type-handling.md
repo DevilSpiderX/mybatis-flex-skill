@@ -119,9 +119,22 @@ private List<String> tags;
 private YourConfigClass config;
 ```
 
-坑点：`JacksonTypeHandler` 只有 `(Class<?> propertyType)` 和 `(Class<?>, Class<?>)` 两个构造器
-（`mybatis-flex-core/.../handler/JacksonTypeHandler.java:36-43`），由框架按字段类型实例化，**泛型参数丢失**——
-`List<Bean>` 反序列化回来元素是 `Map` 而不是 `Bean`。需要精确泛型时为该字段写专用 handler。
+坑点（泛型还原有边界）：`JacksonTypeHandler` 只有 `(Class<?> propertyType)` 和 `(Class<?>, Class<?>)` 两个构造器
+（`mybatis-flex-core/.../handler/JacksonTypeHandler.java:36-43`），由框架按字段类型实例化，不接收
+`JavaType`/`TypeReference` 级别的完整泛型签名，泛型还原只支持**一层集合元素类型**：
+
+- 一层 `List<Bean>` / `Set<Bean>`：**能**正确还原元素为 Bean——集合字段走 `createCollectionTypeHandler`
+  解析元素类型后调 `(Class, Class)` 双参构造器（`TableInfoFactory.java:491-492,568-580`，1.10.0 起支持）。
+- `Map<String, Bean>`：**丢**——`Map` 不是 `Collection`，走 MyBatis `TypeHandlerRegistry.getInstance`
+  只按 `(Class)` 单参构造传 `Map.class`（`TableInfoFactory.java:505`），value 反序列化为
+  `LinkedHashMap` 而不是 Bean。
+- `List<Map<String, Bean>>`、`List<List<Bean>>`：**丢**——元素类型是嵌套 `ParameterizedType`，
+  解析不出 `Class`，`genericClass` 为 null（`TableInfoFactory.java:571-576`），回退按 raw `List`
+  反序列化，元素是 `Map`。
+- `List<? extends Bean>`（WildcardType）、泛型类字段 `List<T>`（TypeVariable）：**丢**，同样解析不出 `Class`。
+
+需要精确泛型（Map 值类型、嵌套泛型、通配符等）时为该字段写专用 handler，构造精确 `JavaType`
+（如 `constructMapType(Map.class, String.class, Bean.class)`）。
 
 ### 其他 JSON 处理器
 
@@ -281,7 +294,7 @@ public class Account {
 
 | 处理器 | 用途 |
 |--------|------|
-| `JacksonTypeHandler` | Jackson JSON（构造参数为字段类型） |
+| `JacksonTypeHandler` | Jackson JSON（构造参数为字段类型；集合字段支持一层泛型，Map/嵌套泛型丢失） |
 | `FastjsonTypeHandler` | Fastjson 1.x JSON（需 fastjson 依赖） |
 | `Fastjson2TypeHandler` | Fastjson2 JSON（需 fastjson2 依赖；接口/抽象类型写 `@type`） |
 | `GsonTypeHandler` | Gson JSON（需 gson 依赖） |
