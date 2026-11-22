@@ -21,6 +21,45 @@ UPDATE `tb_account` SET `user_name` = ? , `age` = age + 1
 WHERE `id` = ?
 ```
 
+> 上例是表**没有**乐观锁列时的语义。若表启用乐观锁（含 `version` 列），实际 SQL 还会在 SET 末尾追加 `version = version + 1`，见下节。
+
+## 乐观锁
+
+**`UpdateChain.update()` 会推进乐观锁版本号**，但不校验版本号。
+
+表启用乐观锁（`@Column(version = true)` 或全局 `setVersionColumn`）时，`update()` 的实际语义：
+
+```sql
+UPDATE `tb_account` SET `user_name` = ? , `age` = age + 1 , `version` = `version` + 1
+WHERE `id` = ?
+```
+
+依据：`UpdateChain.update()` 走 `baseMapper.updateByQuery(entity, this)`
+（mybatis-flex-core/src/main/java/com/mybatisflex/core/update/UpdateChain.java:136-138）；
+`EntitySqlProvider.updateByQuery`（mybatis-flex-core/src/main/java/com/mybatisflex/core/provider/EntitySqlProvider.java:258-288）
+先用 `appendConditions(null, qw)` 置标志（:266、:386），
+随后 `:274` 的 `appendConditions(entity, qw)` 直接 return
+（mybatis-flex-core/src/main/java/com/mybatisflex/core/table/TableInfo.java:993-1000），
+跳过了 `TableInfo.java:1025-1030` 的 version 条件与 null 检查；
+SET 的 `+1` 由
+mybatis-flex-core/src/main/java/com/mybatisflex/core/dialect/impl/CommonsDialectImpl.java:936-940
+无条件追加（仅受
+`OptimisticLockManager` 开关影响）。完整入口清单见
+`references/07-core-features.md` 乐观锁章节。
+
+因此：
+
+- **不要**把 `UpdateChain` 当成“不推进版本的局部更新”。它推进版本，会让其他持有旧 version 的 `update(entity)` CAS 更新变成 0 行。
+- `set(ACCOUNT.VERSION, ...)` / `setRaw(ACCOUNT.VERSION, ...)` 会被 `TableInfo.obtainUpdateColumns`
+  （`TableInfo.java:722-728`）过滤，不能指定目标版本号。
+- 需要 CAS 时手写 `.where(ACCOUNT.VERSION.eq(oldVersion))`；`update()` 返回 `false` 只表示 WHERE 影响 0 行。
+- 需要“不推进版本”的列级更新时，改用 `Db.updateById("tb_account", row)` /
+  `Db.updateByQuery("tb_account", row, query)` / `Db.updateBySql(...)`（Row/SQL 路径不处理 version）；
+  `DbChain.update(entity)` 会把 version 旧值原样写回，同样不 +1。
+- `OptimisticLockManager.execWithoutOptimisticLock(() -> ...)` 会同时关闭校验和 `+1`
+  （Commons 方言；ClickHouse 的 `update(entity)` 例外，见 07 乐观锁章节）。
+- `UpdateChain.remove()` 是 DELETE，不涉及版本号。
+
 ## 何时优先使用
 
 - 用户要求链式更新、动态更新、只更新传入字段、字段非空才更新时，优先考虑 `UpdateChain`。

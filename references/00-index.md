@@ -28,7 +28,7 @@
 | @Id 注解 | `02-annotations.md` | 主键策略、复合主键、生成器 |
 | @Column 注解 | `02-annotations.md`、`07-core-features.md` | 忽略字段、逻辑删除、乐观锁、租户、填充值 |
 | 逻辑删除 | `07-core-features.md` | `@Column(isLogicDelete = true)` 或全局逻辑删除配置 |
-| 乐观锁 | `07-core-features.md` | `@Column(version = true)`，更新时校验版本并递增 |
+| 乐观锁 | `07-core-features.md`、`06-updatechain.md` | `@Column(version = true)`：`update(entity)` 校验并递增；`updateByQuery`/`UpdateChain` 只递增不校验 |
 | 数据填充 | `07-core-features.md`、`08-base-entities.md` | Java 层 onInsert/onUpdate 与数据库层 onInsertValue/onUpdateValue 分开 |
 | 数据脱敏 | `07-core-features.md` | 查询结果脱敏，不替代权限控制 |
 | 数据缓存 | `07-core-features.md` | 关注缓存失效和更新一致性 |

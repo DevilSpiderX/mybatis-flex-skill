@@ -98,29 +98,88 @@ QueryWrapper query = new QueryWrapper()
 
 **注解**：`@Column(version = true)`（`Column.java:72`），仅支持数值字段。同表多个 version 字段启动即抛 `The version column of entity[%s] must be less then 2.`（`TableInfoFactory.java:404-411`）。也可不写注解，用全局列名 `FlexGlobalConfig.getDefaultConfig().setVersionColumn("version")`（`FlexGlobalConfig.java:323`）。
 
-**SQL 行为**（`CommonsDialectImpl.java:869-903`，updateByQuery 同理见 `944-947`）：
+**结论先行**：不是所有 update 入口都「校验 + 递增」。`update(entity)` 家族做 CAS（WHERE 带 version）；`updateByQuery` / `UpdateChain` 家族**只递增、不校验**（WHERE 不带 version）；`Db` 的 Row / 原生 SQL 路径**完全不处理 version**。
+
+### SQL 行为
+
+`update(entity)`（含 `updateById`）——校验 + 递增：
 
 ```sql
 UPDATE tb_account SET nickname = ?, version = version + 1
 WHERE id = ? AND is_delete = 0 AND version = ?
 ```
 
+SET 的 `version = version + 1` 在 `CommonsDialectImpl.java:861-865`；WHERE 的 `version = ?` 在 `:888-895`（version 为 null 抛 `ENTITY_VERSION_NULL`）。
+
+`updateByQuery` / `UpdateChain.update()`——递增但不校验：
+
+```sql
+UPDATE tb_account SET nickname = ?, version = version + 1
+WHERE id = ? AND is_delete = 0
+```
+
+SET 的 `+1` 在 `CommonsDialectImpl.java:936-940`；WHERE 只来自 queryWrapper（`:945`），没有自动 version 条件。原因：`EntitySqlProvider.updateByQuery` 先用 `appendConditions(null, qw)` 置标志（`:266`、`:386`），随后 `:274` 的 `appendConditions(entity, qw)` 直接 return（`TableInfo.java:993-1000`），跳过了 `TableInfo.java:1025-1030` 的 version 条件与 null 检查。
+
 ```java
 Account a = mapper.selectOneById(1);
 a.setNickname("x");
 mapper.update(a); // 必须携带查出来的 version
+
+UpdateChain.of(Account.class)
+    .set(Account::getNickname, "x")
+    .where(Account::getId).eq(1)
+    .update();        // 会推进 version，但不校验 version
 ```
 
+### 各 update 入口与版本推进
+
+| 入口 | 推进 `version + 1` | 校验 `version = ?` | 依据 |
+|------|--------------------|--------------------|------|
+| `BaseMapper.update(entity)` / `update(entity, ignoreNulls)` | ✅ | ✅ | `EntitySqlProvider.java:226-247` → `CommonsDialectImpl.java:861-865, 888-895` |
+| `IService.updateById` / `MapperModel.updateById` / `UpdateEntity + mapper.update` | ✅ | ✅ | 同上（`IService.java:214-227`、`MapperModel.java:177-200`） |
+| `IService.updateBatch` / `IService.saveOrUpdate(Batch)` / `MapperModel.saveOrUpdate` / `CacheableServiceImpl.saveOrUpdate` 更新分支 / `BaseMapper.insertOrUpdate` 更新分支 | ✅ | ✅ | `BaseMapper.java:249-257`；`IService.java:104-106, 129-131, 299-319`；`MapperModel.java:136-138`；`CacheableServiceImpl.java:61-68` |
+| `Db.updateEntitiesBatch(entities[, batchSize])` | ✅ | ✅ | `Db.java:458-470` → `RowMapper.updateEntity`（`:213-214`）→ `RowSqlProvider.updateEntity`（`:258`）→ `forUpdateEntity` |
+| `BaseMapper.updateByQuery` / `updateByMap` / `updateByCondition` | ✅ | ❌ | `EntitySqlProvider.java:258-288` → `CommonsDialectImpl.java:936-940, 945` |
+| `IService.update(entity, Map/QueryCondition/QueryWrapper)` | ✅ | ❌ | `IService.java:237-263` → `updateByQuery` |
+| `Model.update()`（ActiveRecord） | ✅ | ❌ | `Model.java:71-94` → `baseMapper().updateByQuery(...)` |
+| **`UpdateChain.update()`** / `IService.updateChain()` | ✅ | ❌ | `UpdateChain.java:136-138` → `updateByQuery`；理由同上 |
+| `Db.updateById(Row)` / `Db.updateBatchById` / `Db.updateByMap` / `Db.updateByCondition` / `Db.updateByQuery(Row)` | ❌ | ❌ | `RowSqlProvider.java:179-212`；`CommonsDialectImpl.java:266-357, 372-399`，Row 路径无 version 逻辑 |
+| `Db.updateBySql` / `Db.updateBatch(sql, ...)` | ❌ | ❌ | 原生 SQL，框架不解析 version |
+| `DbChain.update()` / `update(Row/Map/entity)` / `updateById()` | ❌ | ❌ | `DbChain.java:158-164, 205-217` → `Db.updateByQuery` / `Db.updateById` |
+| `OptimisticLockManager.execWithoutOptimisticLock(...)` 内（Commons 方言） | ❌ | ❌ | `OptimisticLockManager.java:33-52, 74-83` → `getOptimisticLockColumnOrSkip()` 返回 null；ClickHouse 的 `update(entity)` 例外（见坑点） |
+
+### UpdateChain 会推进版本
+
+`UpdateChain.update()` 等价于 `baseMapper.updateByQuery(entity, this)`（`UpdateChain.java:136-138`），走的就是上表的「推进但不校验」路径：
+
+- SET 自动追加 `version = version + 1`（`CommonsDialectImpl.java:936-940`）；
+- WHERE 不会自动追加 `version = ?`，version 为 null 也不会抛 `ENTITY_VERSION_NULL`；
+- `set(ACCOUNT.VERSION, ...)` / `setRaw(ACCOUNT.VERSION, ...)` 会被 `TableInfo.obtainUpdateColumns` 过滤（`TableInfo.java:722-728`），不能指定目标版本；
+- 返回 `false` 只表示 WHERE 影响 0 行，不是版本冲突信号；
+- 它会推进版本，因此其他持有旧 version 的 `update(entity)` CAS 会更新 0 行。需要 CAS 时手写 `.where(ACCOUNT.VERSION.eq(oldVersion))`；需要“不推进版本”的列级更新时用 `Db.updateById(Row)` / `Db.updateByQuery(Row)` / `Db.updateBySql`（Row/SQL 路径不处理 version），或 `execWithoutOptimisticLock`（会同时关闭校验与递增）。
+
+### 需要“不推进版本”的写法
+
+- `Db.updateById("tb_account", row)`、`Db.updateByQuery("tb_account", row, query)`、`Db.updateBySql(...)`：Row/原生 SQL 路径，框架不会自动 `version + 1`，也不会校验；row 里若带 version 列，会按普通列原样写入。
+- `DbChain.update(entity)` 的 `toRow` 会复制所有非 null 字段（含 version，`DbChain.java:166-203`），`Row.getModifyAttrs()` 返回全部 key（`Row.java:500-509`），因此会把 version 旧值写回数据库——既不 +1，也可能覆盖并发推进。
+- `OptimisticLockManager.execWithoutOptimisticLock(() -> ...)`（`OptimisticLockManager.java:33-52`）：Commons 方言下既不校验也不递增。
+
+### 版本值规则与失败语义
+
 - 插入时 version 为 null 自动置 0（`TableInfo.initVersionValueIfNecessary`，`TableInfo.java:1509-1521`；调用点 `EntitySqlProvider.java:62`）。
-- 更新时实体 version 为 null 抛 `FlexExceptions(ENTITY_VERSION_NULL)`：`The version value of entity "{0}" must not be null.`（`mybatis-flex-core/src/main/java/com/mybatisflex/core/exception/locale/LocalizedFormats.java:52`）。
+- `update(entity)` / `updateById` 路径下，实体 version 为 null 抛 `FlexExceptions(ENTITY_VERSION_NULL)`：`The version value of entity "{0}" must not be null.`（`mybatis-flex-core/src/main/java/com/mybatisflex/core/exception/locale/LocalizedFormats.java:52`）；`updateByQuery` / `UpdateChain` 不检查。
 - **version 不匹配时源码中未提供异常机制**：影响行数为 0，`update` 返回 false，需业务自行判断。
-- 跳过：`OptimisticLockManager.execWithoutOptimisticLock(() -> ...)`（`mybatis-flex-core/src/main/java/com/mybatisflex/core/optimisticlock/OptimisticLockManager.java:33-52`）。
+- 跳过：`OptimisticLockManager.execWithoutOptimisticLock(() -> ...)`，效果与方言差异见上节。
 
 坑点：
 
-- `UpdateEntity.of(Account.class, id)` 局部更新忘 set version 会直接抛 ENTITY_VERSION_NULL。
-- 并发失败只返回 false，不抛异常、不自动重试。
-- 乐观锁条件附加在逻辑删除条件之后，已删除数据同样更新不到。
+- `UpdateChain` / `updateByQuery` **会推进版本**，不要默认“局部更新不动版本”；用它更新列级投影后，游标/在途请求持有的旧 version 会被 CAS 拒绝。
+- `UpdateEntity.of(Account.class, id)` 走 `update(entity)`，局部更新忘 set version 会直接抛 `ENTITY_VERSION_NULL`；而 `UpdateChain` 不需要 set version（set 了也会被过滤）。
+- `version` 不匹配时只返回 false，不抛异常、不自动重试。
+- 乐观锁条件附加在逻辑删除条件之后，已删除数据同样更新不到（`CommonsDialectImpl.java:877-895`）。
+- 表无 version 列（未注解且未全局配置）时所有路径都不推进；`TableInfoFactory.java:402-410` 只有在实体列名匹配注解或全局 `config.getVersionColumn()` 时才识别。
+- ClickHouse 方言的 `forUpdateEntity` 在 WHERE 判断上用的是 `hasText(versionColumn)` 而非 `getOptimisticLockColumnOrSkip()`（`ClickhouseDialectImpl.java:451-457`）：`execWithoutOptimisticLock` 下它仍要求 version 非 null 并附加 WHERE version（SET 不递增）。源码推导，未实测。
+- `UpdateChain` 显式 `.from(...)` 指向未注册表名时，`EntitySqlProvider.getTableInfos`（`:403-421`）可能返回空，导致 `appendConditions(entity, qw)` 未被短路、version 为 null 时抛 `ENTITY_VERSION_NULL`；常规单表/Join 不触发。源码推导，未实测。
 
 ## 数据填充
 

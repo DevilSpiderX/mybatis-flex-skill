@@ -132,7 +132,7 @@ mapper.selectOneWithRelationsByQuery(query);
 private Integer version;
 ```
 
-更新时校验版本号，更新成功后版本号 +1，只能用于数值字段。源码：`mybatis-flex-annotation/src/main/java/com/mybatisflex/annotation/Column.java:66-72`。
+`update(entity)` / `updateById` 更新时校验版本号，成功后版本号 +1；`updateByQuery` / `UpdateChain` 只 +1、不校验。只能用于数值字段。源码：`mybatis-flex-annotation/src/main/java/com/mybatisflex/annotation/Column.java:66-72`。详见 `07-core-features.md` 乐观锁章节。
 
 ### 逻辑删除
 

@@ -135,8 +135,9 @@ public final class EntityDiffUtil {
     /**
      * 比较两个同类实体，返回仅包含变化字段的 UpdateChain。
      * <p>
-     * UpdateChain 已附加主键 WHERE 条件和乐观锁版本条件，调用方直接调用 {@code .update()} 即可。
-     * 无变化时返回 null。
+     * 返回的 UpdateChain 已由本方法附加主键 WHERE 条件和乐观锁版本条件，调用方直接调用 {@code .update()} 即可；无变化时返回 null。
+     * <p>
+     * 注意：框架的 UpdateChain 自身不会附加 version 条件；带 version 列时它仍会执行 {@code version = version + 1}。
      *
      * @param mapper    BaseMapper 实例，不允许为 null
      * @param oldEntity 旧实体，不允许为 null

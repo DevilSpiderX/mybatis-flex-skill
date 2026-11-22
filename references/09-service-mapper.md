@@ -114,6 +114,10 @@ int updateByQuery(T entity, boolean ignoreNulls, QueryWrapper query);  // ignore
 （源码：`BaseMapper.java:359-449`。不存在 `updateByQueryWithNulls`，需要"包含 null 更新"用
 三参版传 `false`。）
 
+**乐观锁**：`update(T)` 走 CAS（WHERE 校验 version 并 `version + 1`，实体 version 为 null 抛
+`ENTITY_VERSION_NULL`）；`updateByQuery(...)` 只 `version + 1`、不校验 version。
+详见 `07-core-features.md` 与 `06-updatechain.md` 的乐观锁章节。
+
 ### 删除
 
 ```java
@@ -132,6 +136,10 @@ update.setUserName("张三");
 update.setAge(25);
 accountMapper.update(update);
 ```
+
+`mapper.update(update)` 走 `update(entity)`，会校验 `update` 中的 version 并推进版本；局部更新必须
+`update.setVersion(查出的 version)`，否则抛 `ENTITY_VERSION_NULL`。这与 `UpdateChain` 不同
+（`UpdateChain` 会推进但不校验，见 `06-updatechain.md`）。
 
 ## Db 工具类
 
